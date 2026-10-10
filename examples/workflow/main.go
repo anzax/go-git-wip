@@ -162,7 +162,7 @@ func run(ctx context.Context) error {
 		fmt.Printf("%s %s +%d -%d\n", change.Status, change.Path, change.Added, change.Deleted)
 	}
 	fmt.Println("Cancellation: verified")
-	return nil
+	return runSession(ctx, repository, root, git)
 }
 
 func isolateEnvironment(directory string) error {

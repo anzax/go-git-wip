@@ -1,5 +1,8 @@
 # Library guide
 
+For hook-driven workspace checkpoints and per-turn review endpoints, see
+[agent-session integration](agent-sessions.md) and its runnable example.
+
 Import `github.com/anzax/go-git-wip` as `wip`. The package uses standard-library
 dependencies and local Git 2.30+ on Linux or macOS. Open a repository from an explicit
 directory, including a subdirectory; calls never change the process working directory.

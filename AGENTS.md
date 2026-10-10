@@ -3,6 +3,8 @@
 Read README.md, the current task, and docs/requirements.md before implementation.
 Settled API/storage policies live in docs/architecture.md; CLI contracts live in
 docs/cli.md. Follow tasks/README.md for progress and handoff.
+Agent-hook integration guidance and caller-owned turn tracing live in
+docs/agent-sessions.md; do not infer session boundaries from checkpoint ancestry.
 
 ## Implementation
 

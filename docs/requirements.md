@@ -133,6 +133,13 @@ capture edits, inspect history, select two SHAs, and obtain their changed-file s
 The example should demonstrate cancellation/error handling and a no-change result.
 It must use the public API rather than internal packages or CLI output parsing.
 
+Document agent-session integration with whole-workspace start/end captures and
+caller-owned turn records. Validate unchanged turns, intervening captures and normal
+commits using explicit review endpoints; distinguish snapshot intervals from agent
+authorship. Cover host locking, deadlines, ambiguous failures, retention and legacy
+cutover without implementing a host workflow engine. See
+[agent-session integration](agent-sessions.md).
+
 Document prerequisites, build/test commands, library examples, CLI usage, capture
 policies, ref/history lifecycle, and limitations. Explain that checkpoints are local
 and ephemeral rather than a backup system. Ignored files are excluded by default,

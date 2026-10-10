@@ -23,6 +23,8 @@ It imports `github.com/anzax/go-git-wip`, creates an isolated temporary reposito
 captures a baseline, an edit, and a newly created file, verifies unchanged capture,
 compares two history IDs, checks cancellation, and removes its repository. See the
 [consumer source](examples/workflow/main.go) and [library guide](docs/library.md).
+The example also validates explicit turn boundaries, intervening captures, and
+normal commits; see [agent-session integration](docs/agent-sessions.md).
 
 Build and use the CLI with your own repository:
 
