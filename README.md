@@ -38,6 +38,17 @@ make build
 The [CLI guide](docs/cli.md) documents commands, JSON, exit codes, and explicit
 `--yes` confirmation for deletion.
 
+Install the CLI from this checkout:
+
+```sh
+make install
+go-git-wip --help
+```
+
+Installation uses `go install ./cmd/go-git-wip` and honors `GOBIN`. When `GOBIN`
+is unset, Go installs into the first `GOPATH` entry's `bin` directory (normally
+`$HOME/go/bin`). Add the installation directory to your `PATH`.
+
 ## Capture and history policies
 
 - Tracked working content is captured by default, including staged additions.

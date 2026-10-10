@@ -1,7 +1,10 @@
-.PHONY: build test check example race fmt
+.PHONY: build install test check example race fmt
 
 build:
 	go build -o bin/go-git-wip ./cmd/go-git-wip
+
+install:
+	go install ./cmd/go-git-wip
 
 test:
 	go test ./...
