@@ -1,104 +1,125 @@
 # go-git-wip
 
-An MIT-licensed Go library and thin CLI for working-tree checkpoints stored as
-native Git commits. Capture preserves HEAD, normal branch refs, the real index,
-and working files. Git operations use the local Git executable.
+Save work-in-progress snapshots without changing your files, staging area, or
+current branch. Review them later using the CLI, the Go library, or Git itself.
 
-Inspired by the excellent [git-wip](https://github.com/bartman/git-wip) by Bart Trojanowski.
-This project has its own API and behavior; compatibility with git-wip is not a goal.
+Checkpoints are stored as Git commits in a separate history for each branch. You
+can save unfinished work without adding commits to your normal branch history.
 
-## Quickstart
+Inspired by [git-wip](https://github.com/bartman/git-wip) by Bart Trojanowski.
+This is an independent implementation with its own API and behavior.
 
-Requires Go 1.26.2+ and Git 2.30+. Supported platforms are Linux and macOS.
-Validation uses Go 1.27.2 and Git 2.56.0 on Linux/arm64; neither macOS nor the
-minimum Git version has been execution-tested.
+## Install
 
-Run the disposable external Go consumer:
+Requires Go 1.26.2+ and Git 2.30+. Targets Linux and macOS; validation so far has
+been on Linux only.
 
-```sh
-make example
-```
-
-It imports `github.com/anzax/go-git-wip`, creates an isolated temporary repository,
-captures a baseline, an edit, and a newly created file, verifies unchanged capture,
-compares two history IDs, checks cancellation, and removes its repository. See the
-[consumer source](examples/workflow/main.go) and [library guide](docs/library.md).
-The example also validates explicit turn boundaries, intervening captures, and
-normal commits; see [agent-session integration](docs/agent-sessions.md).
-
-Build and use the CLI with your own repository:
-
-```sh
-make build
-./bin/go-git-wip --help
-./bin/go-git-wip -C ./project save --baseline -m "review start"
-# Edit files, then capture their working content:
-./bin/go-git-wip -C ./project save
-./bin/go-git-wip -C ./project history --json
-```
-
-The [CLI guide](docs/cli.md) documents commands, JSON, exit codes, and explicit
-`--yes` confirmation for deletion.
-
-Install the CLI from this checkout:
+From this checkout:
 
 ```sh
 make install
-go-git-wip --help
 ```
 
-Installation rebuilds the CLI and installs it into `$HOME/.local/bin` by default.
-Add that directory to your `PATH` if needed. To choose another destination:
+This builds `go-git-wip` and installs it into `~/.local/bin`. Make sure that directory
+is on your `PATH`. To use another location, run `make install BINDIR=/your/bin`.
+
+To try it without installing, run `make build` and use `./bin/go-git-wip`.
+
+## Save and review your work
+
+In a Git repository with at least one commit, while on a branch:
 
 ```sh
-make install BINDIR=/custom/path
+# Save a starting point, even if nothing has changed.
+go-git-wip save --baseline -m "Before the refactor"
+
+# Edit your files, then save a checkpoint.
+go-git-wip save -m "First working version"
+
+# List checkpoints, newest first.
+go-git-wip history
+
+# Review a checkpoint using an ID from history.
+go-git-wip show CHECKPOINT_ID --patch
 ```
 
-## Capture and history policies
+Saving includes changes to tracked files and new files that Git does not ignore.
+It leaves your files and staging decisions intact, including partially staged
+files. If the snapshot matches the previous checkpoint, `save` reports `No changes`.
 
-- Tracked working content and non-ignored untracked files are captured by default,
-  including staged additions. Use `--tracked-only` to exclude untracked files or
-  `--ignored` to include ignored files; these flags conflict. Selecting a path never
-  overrides these policies. Every explicit selection must match eligible content;
-  unmatched selections fail, including mixtures of valid paths and typos.
-- Every snapshot starts from HEAD. In partial captures, unselected paths keep HEAD
-  content. An unchanged capture succeeds without creating a commit; a baseline
-  forces creation.
-- Checkpoints live in `refs/wip/<branch>`. A normal HEAD change starts a new stack;
-  earlier tips may remain discoverable through retained reflog entries.
-- Capture needs an attached local branch and an existing commit. Sparse worktrees,
-  unmerged indexes, and gitlinks/submodules are unsupported for capture.
+Use `-C /path/to/project` to work in another repository. Add `--json` for scripts.
+See the [CLI guide](docs/cli.md) for comparisons, file reads, and checkpoint deletion.
 
-Checkpoints are local and ephemeral, not backups. Reflog expiry and normal Git
-garbage collection apply; deleting a ref may remove its reflog. Included files are
-not scanned for secrets. The library does not restore files or run garbage collection.
+## What gets saved?
+
+By default, `save` captures the whole working tree, excluding ignored files. You
+can narrow or expand that selection:
+
+```sh
+go-git-wip save src/ README.md  # Only these paths
+go-git-wip save --tracked-only # Exclude new, untracked files
+go-git-wip save --ignored      # Also include ignored files
+```
+
+Each snapshot starts from your current branch commit (`HEAD`). When you save only
+selected paths, all other paths use their HEAD content—even if an earlier
+checkpoint saved changes to them. Explicit paths must match files eligible for
+capture; a typo or an excluded-only selection is an error.
+
+Checkpoints live under `refs/wip/<branch>`. After HEAD changes, for example when
+you make a normal commit, the next checkpoint starts a new history from that
+commit. Older histories may still be available through `go-git-wip reflog` while
+Git retains them.
+
+Checkpoints are temporary local history, not backups. Git's normal expiry and
+garbage collection rules apply. The tool can read saved files but does not restore
+your working tree. Capture does not support sparse worktrees, unresolved merge
+conflicts, or submodules. Included files are not scanned for secrets.
+
+## Use it from Go
+
+The public package is `wip`. It uses the standard library and your local Git
+executable; the CLI is optional.
+
+```go
+import (
+    "context"
+
+    wip "github.com/anzax/go-git-wip"
+)
+
+func checkpoint(ctx context.Context, directory string) (wip.CaptureResult, error) {
+    repo, err := wip.Open(ctx, directory)
+    if err != nil {
+        return wip.CaptureResult{}, err
+    }
+    return repo.Capture(ctx, wip.CaptureOptions{Message: "Work in progress"})
+}
+```
+
+The [library guide](docs/library.md) covers history, comparisons, errors, and
+cancellation. For agent integrations, see [session tracking](docs/agent-sessions.md).
+
+Run a complete example with `make example`. It creates and removes its own temporary
+repository, so you can try it without changing an existing project.
 
 ## Development
 
 ```sh
-make check   # formatting, vet, tests, and the external consumer workflow
-make build
-make race    # optional; requires cgo and a C compiler
+make check   # Formatting, vet, tests, and the runnable example
+make build   # Build bin/go-git-wip
+make race    # Optional; requires cgo and a C compiler
 ```
 
-Cobra v1.10.2 supplies the CLI; pflag v1.0.10 and mousetrap v1.1.0 are indirect
-dependencies. Cobra and mousetrap use Apache-2.0; pflag uses BSD-3-Clause. The public
-library uses the standard library and local Git only.
+The root package contains the library. `internal/cli` handles commands and output;
+`cmd/go-git-wip` is the executable entry point.
 
-The module is `github.com/anzax/go-git-wip`; the executable is `go-git-wip`.
+See [requirements](docs/requirements.md), [architecture](docs/architecture.md),
+[contributor instructions](AGENTS.md), and [task workflow](tasks/README.md).
+Validation details and platform limitations are recorded in the
+[library guide](docs/library.md#errors-cancellation-and-limits).
 
-## Project map
+## License
 
-- Root package `wip`: public checkpoint library.
-- `cmd/go-git-wip`: process entry point; `internal/cli`: Cobra adapter.
-- [Library guide](docs/library.md) and [CLI guide](docs/cli.md): public usage.
-- [Requirements](docs/requirements.md): checkpoint behavior and validation goals.
-- [Architecture](docs/architecture.md): library boundary and Git implementation direction.
-- [Tasks](tasks/README.md): work, acceptance criteria, and verification records.
-- [Agent instructions](AGENTS.md): development and contribution rules.
-
-## License and inspiration
-
-This project's original material is licensed under [MIT](LICENSE). git-wip is
-acknowledged as inspiration, not included as a dependency or implementation.
-Dependency licenses remain their own.
+[MIT](LICENSE). The CLI uses Cobra (Apache-2.0), with pflag (BSD-3-Clause) and
+mousetrap (Apache-2.0) as indirect dependencies. Dependency licenses remain their own.
