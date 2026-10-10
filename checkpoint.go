@@ -4,20 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
 )
-
-const checkpointMarker = "go-git-wip:1 "
-
-type checkpointMetadata struct {
-	Branch string `json:"branch"`
-	Base   string `json:"base"`
-}
 
 func checkpointRef(branch string) string { return "refs/wip/" + branch }
 
@@ -88,13 +78,9 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	if !found {
 		return invalid("checkpoint commit has no message")
 	}
-	line, message, found := strings.Cut(string(body), "\n\n")
-	if !found || !strings.HasPrefix(line, checkpointMarker) || strings.ContainsRune(line, '\n') {
-		return invalid("commit is not a version 1 checkpoint")
-	}
-	meta, err := decodeMetadata(strings.TrimPrefix(line, checkpointMarker))
+	meta, message, err := decodeCheckpointMessage(string(body))
 	if err != nil {
-		return invalid("invalid checkpoint metadata: " + err.Error())
+		return invalid(err.Error())
 	}
 	if _, err := r.validateCheckpointRef(ctx, checkpointRef(meta.Branch)); err != nil {
 		return Checkpoint{}, err
@@ -116,7 +102,7 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	if base != meta.Base {
 		return invalid("checkpoint base is not a direct commit ID")
 	}
-	cp := Checkpoint{Commit: oid, Branch: meta.Branch, Base: meta.Base, Message: strings.TrimSuffix(message, "\n")}
+	cp := Checkpoint{Commit: oid, Branch: meta.Branch, Base: meta.Base, Message: message}
 	parents := 0
 	committer := false
 	for _, header := range strings.Split(string(headers), "\n") {
@@ -150,44 +136,6 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 		return invalid("checkpoint parent must be a full direct commit ID")
 	}
 	return cp, nil
-}
-
-// decodeMetadata rejects unknown, duplicate, missing, and non-string fields.
-func decodeMetadata(raw string) (checkpointMetadata, error) {
-	decoder := json.NewDecoder(strings.NewReader(raw))
-	token, err := decoder.Token()
-	if err != nil || token != json.Delim('{') {
-		return checkpointMetadata{}, fmt.Errorf("expected a JSON object")
-	}
-	fields := make(map[string]string, 2)
-	for decoder.More() {
-		token, err := decoder.Token()
-		if err != nil {
-			return checkpointMetadata{}, err
-		}
-		key, ok := token.(string)
-		if !ok || (key != "branch" && key != "base") {
-			return checkpointMetadata{}, fmt.Errorf("unknown metadata field")
-		}
-		if _, exists := fields[key]; exists {
-			return checkpointMetadata{}, fmt.Errorf("duplicate metadata field")
-		}
-		var value string
-		if err := decoder.Decode(&value); err != nil {
-			return checkpointMetadata{}, err
-		}
-		fields[key] = value
-	}
-	if _, err := decoder.Token(); err != nil {
-		return checkpointMetadata{}, err
-	}
-	if _, err := decoder.Token(); err != io.EOF {
-		return checkpointMetadata{}, fmt.Errorf("trailing metadata data")
-	}
-	if fields["branch"] == "" || fields["base"] == "" {
-		return checkpointMetadata{}, fmt.Errorf("branch and base are required")
-	}
-	return checkpointMetadata{Branch: fields["branch"], Base: fields["base"]}, nil
 }
 
 func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string) (Checkpoint, error) {

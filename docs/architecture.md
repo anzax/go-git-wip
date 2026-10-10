@@ -114,14 +114,40 @@ from abandoned captures are harmless and left for Git's ordinary maintenance.
 ## Owned storage and deletion
 
 Refs use `refs/wip/<short-local-branch>`, including slash-containing branch names.
-The raw commit message has an exact first-line marker and JSON object, a blank line,
-then the caller's message:
+New checkpoints use version 2: a human message followed by a blank-line separator
+and one final metadata line. With the default ordinary message, the exact body is:
 
 ```text
-go-git-wip:1 {"branch":"main","base":"FULL_OBJECT_ID"}
-
 Checkpoint
+
+go-git-wip:2 {"branch":"main","base":"FULL_OBJECT_ID","message_bytes":10}
 ```
+
+The byte layout is `DISPLAY_MESSAGE + "\n\ngo-git-wip:2 " + METADATA_JSON + "\n"`.
+`message_bytes` counts the original message's bytes after the empty-message default
+(`Checkpoint` or `Baseline`). The metadata has exactly `branch`, `base`, and
+`message_bytes`; the last is a nonnegative integer. Reject missing, duplicate,
+unknown, or incorrectly typed fields, invalid lengths, and malformed framing.
+Key order and insignificant JSON whitespace may vary, but the metadata occupies
+one line followed by exactly one final newline. Caller whitespace and trailing
+newlines are preserved, and NUL is invalid.
+
+Raw bodies beginning `go-git-wip:` are reserved for version-1 dispatch. To avoid
+ambiguity, version-2 display messages beginning that namespace receive the visible
+prefix `Checkpoint: `; the stored length still describes the original message.
+The API removes only that canonical display prefix when length and namespace match.
+Ordinary human messages appear directly as Git subjects under Git's normal subject
+formatting. Fixed Git author identity does not identify an agent or session; callers
+keep that identity in their own records and may put a readable label in the message.
+
+Readers support version 1 and 2 in either order within one stack. Version 1 has
+`go-git-wip:1 {"branch":"...","base":"..."}` on its first line, a blank line,
+and caller text; decoding removes the old writer's one final newline. A raw body
+beginning the reserved namespace must parse as version 1, without footer fallback,
+so footer-looking version-2 text in its caller message remains ordinary text.
+Otherwise, only the final footer line may define a version-2 envelope, with exact
+separator, final newline, and message-byte framing. Unknown versions fail without
+trying another format. Existing commits and refs need no migration or rewriting.
 
 Decode the envelope strictly, require the matching branch, a valid full base commit
 ID, and exactly one parent. The tip's parent must be its base or another owned

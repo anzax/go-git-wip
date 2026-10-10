@@ -121,8 +121,17 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(history) != 2 || history[0].Commit != saved.Commit || history[1].Commit != baseline.Commit {
+	if len(history) != 2 || history[0].Commit != saved.Commit || history[1].Commit != baseline.Commit ||
+		history[0].Message != "edit note and add file" || history[1].Message != "review start" {
 		return fmt.Errorf("unexpected history: %+v", history)
+	}
+	// Git subjects show human messages; API history omits ownership metadata.
+	subject, err := git("log", "-1", "--format=%s", saved.Commit)
+	if err != nil {
+		return err
+	}
+	if subject != history[0].Message {
+		return fmt.Errorf("unexpected Git subject: %q", subject)
 	}
 	// These ordinary full commit IDs also work with the caller's preferred reviewer.
 	from, to := history[1].Commit, history[0].Commit

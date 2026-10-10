@@ -48,7 +48,9 @@ type CaptureOptions struct {
 	TrackedOnly    bool     `json:"tracked_only"`
 	IncludeIgnored bool     `json:"include_ignored"`
 	Baseline       bool     `json:"baseline"`
-	Message        string   `json:"message,omitempty"`
+
+	// Message is preserved exactly in history; empty uses Checkpoint or Baseline.
+	Message string `json:"message,omitempty"`
 }
 
 // CaptureResult describes a published checkpoint or a successful no-change result.
@@ -70,7 +72,8 @@ type Status struct {
 	Active     bool           `json:"active"`
 }
 
-// Checkpoint is a validated, single-parent checkpoint. Message excludes storage metadata.
+// Checkpoint is a validated, single-parent checkpoint. Message preserves the caller
+// message, including trailing newlines, and excludes storage metadata.
 type Checkpoint struct {
 	Commit  string    `json:"commit"`
 	Parent  string    `json:"parent"`

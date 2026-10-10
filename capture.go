@@ -3,7 +3,6 @@ package wip
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -80,11 +79,10 @@ func (r *Repository) Capture(ctx context.Context, options CaptureOptions) (Captu
 			message = "Baseline"
 		}
 	}
-	metadata, err := json.Marshal(checkpointMetadata{Branch: info.Branch, Base: info.HEAD})
+	input, err := encodeCheckpointMessage(info.Branch, info.HEAD, message)
 	if err != nil {
 		return CaptureResult{}, &Error{Kind: KindInvalidOption, Op: "capture", Message: "encode checkpoint metadata", Err: err}
 	}
-	input := []byte(checkpointMarker + string(metadata) + "\n\n" + message + "\n")
 	identity := checkpointIdentity()
 	commit, err := r.gitEnv(ctx, identity, input, "commit-tree", "--no-gpg-sign", strings.TrimSpace(string(tree)), "-p", parent)
 	if err != nil {

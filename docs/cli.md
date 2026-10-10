@@ -41,6 +41,16 @@ excluded-only path, or mixed valid/unmatched selection fails with exit 2 and
 arguments are paths. An unchanged eligible file is valid, but no-change succeeds
 without a commit only when the complete proposed snapshot matches its parent.
 
+`-m TEXT` supplies the human message shown by ordinary Git logs; defaults are
+`Checkpoint` and `Baseline`. New checkpoints place ownership metadata in a version-2
+footer. Messages starting `go-git-wip:` receive the visible prefix `Checkpoint: `
+in raw Git subjects to disambiguate legacy storage. Human CLI history displays the
+original message's first line; JSON returns the full original message, including
+trailing newlines, without internal metadata.
+Version-1 checkpoints and mixed-version stacks remain readable and manageable
+without migration. Fixed Git author identity does not identify a session; keep
+session identity in caller records and use a readable message label when helpful.
+
 `history` and `reflog` accept `--limit N`; zero means unlimited and negative values
 are usage errors. `history`, `show`, and `diff` accept repeatable `--path PATH` filters.
 `show` and `diff` accept `--patch` to include a textual Git patch in addition to the

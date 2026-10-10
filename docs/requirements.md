@@ -57,8 +57,13 @@ staging decisions intact.
   edits so a caller can mark a deliberate starting point.
 - Return whether a commit was created, its full object ID when applicable, its parent,
   the checkpoint ref, and the work-branch HEAD used for the operation.
-- Accept a message and define a useful default. Resolve commit identity using a
-  documented policy. Do not unexpectedly invoke signing prompts or user hooks.
+- Accept a message and define a useful default. New checkpoints show the human
+  message first in ordinary Git logs and put strict versioned ownership metadata
+  after it. Preserve exact caller messages, including multiline/trailing-newline
+  text, in API history; support existing version-1 checkpoints without rewriting
+  them. Resolve commit identity using a documented policy. Fixed Git authorship
+  does not identify an agent/session; callers keep session identity in their records.
+  Do not unexpectedly invoke signing prompts or user hooks.
 - Use an isolated temporary index and conditional ref publication. A competing
   writer must produce a recognizable conflict instead of being overwritten. Clean
   up temporary files on errors and cancellation; harmless unreachable Git objects

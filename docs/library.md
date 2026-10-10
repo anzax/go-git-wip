@@ -126,9 +126,16 @@ and `errors.As(err, &detail)` with `var detail *wip.Error` for structured failur
 text, not an API to parse. Do not mutate option slices while a call is using them.
 
 Capture uses a fixed noninteractive identity, `WIP checkpoint <wip@localhost>`, with
-the current timestamp. Default messages are `Checkpoint` and `Baseline`. Signing
-and hooks are disabled; Git attributes and clean filters still affect captured
-content. Sparse worktrees, unmerged indexes, and gitlinks/submodules are unsupported
+the current timestamp. This identity does not distinguish callers or agent sessions;
+keep session identity in caller records and use a readable label in `Message` when
+useful. Default messages are `Checkpoint` and `Baseline`. Version-2 commits place
+the human message first and ownership metadata in a final footer. Git formats the
+subject normally. Messages beginning `go-git-wip:` receive a visible `Checkpoint: `
+prefix in raw Git display to disambiguate legacy storage; API `Checkpoint.Message`
+returns the original bytes, including multiline text and trailing newlines. Existing
+version-1 history remains supported, including mixed stacks, without rewriting refs
+or commits. Signing and hooks are disabled; Git attributes and clean filters still
+affect captured content. Sparse worktrees, unmerged indexes, and gitlinks/submodules are unsupported
 for capture. Bare repositories and Windows are outside the supported scope.
 
 Conditional updates detect competing checkpoint writers; they do not provide an

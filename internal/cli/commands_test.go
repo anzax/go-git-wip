@@ -230,6 +230,39 @@ func TestSaveRejectsUnmatchedSelectionsWithJSON(t *testing.T) {
 	}
 }
 
+func TestSaveHumanGitSubjectsAndExactHistoryMessages(t *testing.T) {
+	f := newFixture(t)
+	baseline := save(t, f, "--baseline")
+	if f.git("log", "-1", "--format=%s", baseline.Commit) != "Baseline" {
+		t.Fatal("default baseline subject is not readable")
+	}
+	f.write("tracked.txt", []byte("changed\n"))
+	checkpoint := save(t, f)
+	if f.git("log", "-1", "--format=%s", checkpoint.Commit) != "Checkpoint" {
+		t.Fatal("default checkpoint subject is not readable")
+	}
+	for _, message := range []string{"agent session A turn 3\n\n修正 body\n\n", "go-git-wip:1 caller text\n\nbody\n"} {
+		saved := save(t, f, "--baseline", "-m", message)
+		wantSubject := strings.Split(message, "\n")[0]
+		if strings.HasPrefix(message, "go-git-wip:") {
+			wantSubject = "Checkpoint: " + wantSubject
+		}
+		if got := f.git("log", "-1", "--format=%s", saved.Commit); got != wantSubject {
+			t.Fatalf("Git subject = %q, want %q", got, wantSubject)
+		}
+		code, out, diagnostic := invoke(f, "history", "--json", "--limit", "1")
+		var history []wip.Checkpoint
+		decode(t, out, &history)
+		if code != 0 || diagnostic != "" || len(history) != 1 || history[0].Message != message {
+			t.Fatalf("history message did not roundtrip: %+v, %d, %q", history, code, diagnostic)
+		}
+		code, out, diagnostic = invoke(f, "history", "--limit", "1")
+		if code != 0 || diagnostic != "" || !strings.Contains(out, strings.Split(message, "\n")[0]) || strings.Contains(out, "message_bytes") {
+			t.Fatalf("human history = %d, %q, %q", code, out, diagnostic)
+		}
+	}
+}
+
 func TestFileExactBinaryAndJSON(t *testing.T) {
 	f := newFixture(t)
 	content := []byte{0, 1, 255, '\n', 'x'}
