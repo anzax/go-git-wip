@@ -15,7 +15,7 @@ runnable embedding example. Follow [requirements](../../../docs/requirements.md)
 - [x] Define capture-base/parent policies, baseline creation, existing-ref validation,
   identity, and path-selection semantics before exposing the operation API.
 - [x] Implement private Git execution and repository discovery with cancellation.
-- [ ] Implement capture with a private index, explicit options, no-change results,
+- [x] Implement capture with a private index, explicit options, no-change results,
   reflogs, conditional ref updates, and preservation assertions.
 - [ ] Implement structured status/history, checkpoint inspection, file changes,
   explicit revision-pair comparison, historical file reads, ref listing/deletion,
@@ -58,5 +58,5 @@ reflogs, and state preservation with Git itself. No C++ toolchain is required.
 
 ## Resume
 
-Foundation complete. Next: Sol implements capture against the settled contracts;
-Astra reviews design/correctness before the capture commit.
+Foundation and capture complete. Inspection code passes tests and design review;
+next commit it separately, then deliver CLI and embedding workflow.

@@ -1,6 +1,6 @@
 ---
 title: Capture native checkpoints without changing workspace state
-status: ready
+status: done
 updated: '2026-10-10'
 ---
 
@@ -11,10 +11,15 @@ Follow [requirements](../../../docs/requirements.md) and [architecture](../../..
 
 ## Verification
 
-Pending implementation. Sol high performs mechanical coding/testing; Astra medium
-reviews design and contracts. Run meaningful Git assertions, make check, and make build.
-Commit the completed, reviewed slice separately.
+Real Git tests cover baselines/no-change, fixed identity, tracked/staged eligibility,
+partially staged index preservation, untracked/ignored policy, literal selections,
+subdirectory paths, independent partial snapshots, branch rollover/reflogs, unsupported
+states, invalid refs, SHA-256 objects, cancellation cleanup, and coordinated competing
+capture/normal-branch writes. Astra reviewed contracts/correctness; message roundtrip
+and partial file/directory collision findings were resolved without adding abstractions.
+`make check` and `make build` pass on Linux/arm64 with Go 1.27.2 and Git 2.56.0.
 
 ## Resume
 
-Wait for the repository foundation and dependent operations.
+Capture complete. Next: commit reviewed [inspection](../20261010-1810-inspection/task.md),
+then [CLI and embedding](../20261010-1820-cli-embedding/task.md).

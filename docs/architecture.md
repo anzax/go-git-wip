@@ -155,3 +155,8 @@ with isolated Git identity/configuration and assert exact object/tree/index beha
 The embedding example owns its workflow and cancellation; review tools, daemons,
 watchers, restore operations, hook installers, and editor integration stay outside
 this library.
+
+Git's documented [commit-tree](https://git-scm.com/docs/git-commit-tree) and
+[update-ref](https://git-scm.com/docs/git-update-ref) contracts define object creation,
+conditional publication, and reflog behavior. Implementation tests cross-check
+stored trees, parents, refs, and workspace preservation with Git itself.
