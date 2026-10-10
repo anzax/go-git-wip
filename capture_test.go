@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +113,89 @@ func TestCapturePreservesPartialStagingAndTrackedEligibility(t *testing.T) {
 	}
 }
 
+func TestCaptureEligibilityAndWorkspacePreservation(t *testing.T) {
+	for _, baseline := range []bool{false, true} {
+		for _, mode := range []struct {
+			name               string
+			options            CaptureOptions
+			untracked, ignored bool
+		}{
+			{name: "default", untracked: true},
+			{name: "tracked-only", options: CaptureOptions{TrackedOnly: true}},
+			{name: "ignored", options: CaptureOptions{IncludeIgnored: true}, untracked: true, ignored: true},
+		} {
+			t.Run(fmt.Sprintf("%s/baseline=%v", mode.name, baseline), func(t *testing.T) {
+				f := newTestRepository(t, true)
+				f.write(".gitignore", "ignored*\n")
+				f.git("add", ".gitignore")
+				f.git("commit", "-m", "ignore policy")
+				f.write("added.txt", "staged addition\n")
+				f.git("add", "added.txt")
+				files := map[string]string{
+					"added.txt": "working addition\n", "new space.txt": "new\n", "ignored secret.txt": "ignored\n",
+				}
+				for path, contents := range files {
+					f.write(path, contents)
+				}
+				index, head, branch := f.read(".git/index"), f.git("rev-parse", "HEAD"), f.git("rev-parse", "refs/heads/main")
+				r := openFixture(t, f)
+				options := mode.options
+				options.Baseline = baseline
+				saved := captureFixture(t, r, options)
+				if !saved.Created || saved.Parent != head || saved.HEAD != head {
+					t.Fatalf("unexpected capture: %+v", saved)
+				}
+				wantPaths := []string{".gitignore", "added.txt"}
+				if mode.ignored {
+					wantPaths = append(wantPaths, "ignored secret.txt")
+				}
+				if mode.untracked {
+					wantPaths = append(wantPaths, "new space.txt")
+				}
+				wantPaths = append(wantPaths, "tracked.txt")
+				if got := f.git("ls-tree", "--name-only", saved.Commit); got != strings.Join(wantPaths, "\n") {
+					t.Fatalf("captured paths = %q, want %q", got, wantPaths)
+				}
+				for path, contents := range files {
+					if (path == "new space.txt" && !mode.untracked) || (path == "ignored secret.txt" && !mode.ignored) {
+						continue
+					}
+					if got := f.git("show", saved.Commit+":"+path); got != strings.TrimSuffix(contents, "\n") {
+						t.Fatalf("%s captured %q, want %q", path, got, contents)
+					}
+				}
+				comparison, err := r.Inspect(context.Background(), saved.Commit, CompareOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantChanges := []FileChange{{Path: "added.txt", Status: "A", Added: 1}}
+				if mode.ignored {
+					wantChanges = append(wantChanges, FileChange{Path: "ignored secret.txt", Status: "A", Added: 1})
+				}
+				if mode.untracked {
+					wantChanges = append(wantChanges, FileChange{Path: "new space.txt", Status: "A", Added: 1})
+				}
+				if !reflect.DeepEqual(comparison.Files, wantChanges) {
+					t.Fatalf("comparison = %+v, want %+v", comparison.Files, wantChanges)
+				}
+				options.Baseline = false
+				repeated := captureFixture(t, r, options)
+				if repeated.Created || repeated.Commit != "" || repeated.Parent != saved.Commit || f.git("rev-parse", saved.Ref) != saved.Commit {
+					t.Fatalf("repeated capture changed ref: %+v", repeated)
+				}
+				if !bytes.Equal(index, f.read(".git/index")) || f.git("rev-parse", "HEAD") != head || f.git("rev-parse", "refs/heads/main") != branch || f.git("show", ":added.txt") != "staged addition" {
+					t.Fatal("capture changed index, HEAD, normal branch, or staged content")
+				}
+				for path, contents := range files {
+					if string(f.read(path)) != contents {
+						t.Fatalf("working file %s changed", path)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestCaptureUntrackedIgnoredAndLiteralPaths(t *testing.T) {
 	f := newTestRepository(t, true)
 	f.write(".gitignore", "ignored*\n")
@@ -124,27 +208,36 @@ func TestCaptureUntrackedIgnoredAndLiteralPaths(t *testing.T) {
 		f.write(path, data)
 	}
 	r := openFixture(t, f)
-	selected := captureFixture(t, r, CaptureOptions{Paths: []string{"untracked space.txt", "ignored secret.txt"}})
-	if selected.Created {
-		t.Fatal("explicit paths bypassed untracked policy")
+	excluded := captureFixture(t, r, CaptureOptions{TrackedOnly: true})
+	if excluded.Created || excluded.Commit != "" {
+		t.Fatal("tracked-only capture included newly created files")
 	}
-	newFiles := captureFixture(t, r, CaptureOptions{IncludeUntracked: true})
+	selected := captureFixture(t, r, CaptureOptions{Paths: []string{"untracked space.txt", "ignored secret.txt"}})
+	if !selected.Created || f.git("show", selected.Commit+":untracked space.txt") != "new" || strings.Contains(f.git("ls-tree", "--name-only", selected.Commit), "ignored secret") {
+		t.Fatal("selection did not include untracked file or bypassed ignored policy")
+	}
+	newFiles := captureFixture(t, r, CaptureOptions{})
 	if got := f.git("show", newFiles.Commit+":line\nbreak\t.txt"); got != "odd bytes" {
 		t.Fatalf("odd filename not captured: %q", got)
 	}
-	if strings.Contains(f.git("ls-tree", "--name-only", newFiles.Commit), "ignored secret") {
-		t.Fatal("ignored file included by untracked option")
-	}
-	ignored := captureFixture(t, r, CaptureOptions{IncludeUntracked: true, IncludeIgnored: true})
-	if f.git("show", ignored.Commit+":ignored secret.txt") != "ignored" {
-		t.Fatal("ignored option did not include file")
-	}
-	literal := captureFixture(t, r, CaptureOptions{IncludeUntracked: true, Paths: []string{"literal[1].txt"}})
+	literal := captureFixture(t, r, CaptureOptions{Paths: []string{"literal[1].txt"}})
 	if got := f.git("ls-tree", "--name-only", literal.Commit); !strings.Contains(got, "literal[1].txt") || strings.Contains(got, "literal1.txt") || strings.Contains(got, "untracked space") {
 		t.Fatalf("literal selection expanded or retained unselected edits: %q", got)
 	}
-	_, err := r.Capture(context.Background(), CaptureOptions{IncludeIgnored: true})
+	tracked := captureFixture(t, r, CaptureOptions{TrackedOnly: true, Paths: []string{"untracked space.txt"}})
+	if f.git("rev-parse", tracked.Commit+"^{tree}") != f.git("rev-parse", "HEAD^{tree}") {
+		t.Fatal("explicit selection bypassed tracked-only policy")
+	}
+	ignored := captureFixture(t, r, CaptureOptions{IncludeIgnored: true, Paths: []string{"ignored secret.txt"}})
+	if f.git("show", ignored.Commit+":ignored secret.txt") != "ignored" {
+		t.Fatal("explicit ignored inclusion did not include selected file")
+	}
+	tip, index := f.git("rev-parse", ignored.Ref), f.read(".git/index")
+	_, err := r.Capture(context.Background(), CaptureOptions{TrackedOnly: true, IncludeIgnored: true})
 	requireErrorKind(t, err, KindInvalidOption)
+	if f.git("rev-parse", ignored.Ref) != tip || !bytes.Equal(index, f.read(".git/index")) {
+		t.Fatal("invalid options changed checkpoint ref or index")
+	}
 }
 
 func TestPartialCaptureUsesFreshHEADAndSubdirectoryPaths(t *testing.T) {
@@ -393,11 +486,11 @@ func TestCaptureFileDirectoryReplacementsAndSelection(t *testing.T) {
 	}
 	f.write("tracked.txt/child.txt", "new directory content\n")
 	index := f.read(".git/index")
-	_, err := r.Capture(context.Background(), CaptureOptions{IncludeUntracked: true, Paths: []string{"tracked.txt/child.txt"}})
+	_, err := r.Capture(context.Background(), CaptureOptions{Paths: []string{"tracked.txt/child.txt"}})
 	if err == nil || !bytes.Equal(index, f.read(".git/index")) {
 		t.Fatal("partial replacement discarded an unselected HEAD file or changed index")
 	}
-	whole := captureFixture(t, r, CaptureOptions{IncludeUntracked: true})
+	whole := captureFixture(t, r, CaptureOptions{})
 	if f.git("show", whole.Commit+":tracked.txt/child.txt") != "new directory content" {
 		t.Fatal("file to directory replacement not captured")
 	}
@@ -407,7 +500,7 @@ func TestCaptureFileDirectoryReplacementsAndSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.write("tracked.txt", "regular file again\n")
-	file := captureFixture(t, r, CaptureOptions{IncludeUntracked: true})
+	file := captureFixture(t, r, CaptureOptions{})
 	if f.git("show", file.Commit+":tracked.txt") != "regular file again" {
 		t.Fatal("directory to file replacement not captured")
 	}

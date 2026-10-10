@@ -16,8 +16,8 @@ import (
 // Capture snapshots eligible working files over HEAD while preserving the real
 // index and worktree. Publication uses the observed branch and checkpoint IDs.
 func (r *Repository) Capture(ctx context.Context, options CaptureOptions) (CaptureResult, error) {
-	if options.IncludeIgnored && !options.IncludeUntracked {
-		return CaptureResult{}, &Error{Kind: KindInvalidOption, Op: "capture", Message: "including ignored files requires including untracked files"}
+	if options.TrackedOnly && options.IncludeIgnored {
+		return CaptureResult{}, &Error{Kind: KindInvalidOption, Op: "capture", Message: "tracked-only capture cannot include ignored files"}
 	}
 	if strings.ContainsRune(options.Message, 0) {
 		return CaptureResult{}, &Error{Kind: KindInvalidOption, Op: "capture", Message: "checkpoint message must contain no NUL"}
@@ -154,7 +154,7 @@ func (r *Repository) capturePaths(ctx context.Context, head string, options Capt
 		}
 		eligible[string(path)] = true
 	}
-	if options.IncludeUntracked {
+	if !options.TrackedOnly {
 		args := []string{"ls-files", "--others", "--exclude-standard", "-z"}
 		other, err := r.git(ctx, args...)
 		if err != nil {

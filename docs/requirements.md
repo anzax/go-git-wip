@@ -38,8 +38,9 @@ needed. Applications own task tracking, agent hooks, and review orchestration.
 A checkpoint contains working-file content while leaving the user's workspace and
 staging decisions intact.
 
-- Capture tracked modifications and deletions by default. Support explicit inclusion
-  of untracked and ignored files; ignored files remain excluded by default.
+- Capture tracked modifications/deletions and non-ignored untracked files by default.
+  Support tracked-only capture and explicit ignored inclusion; these options conflict.
+  Ignored files remain excluded by default.
   Staged additions count as tracked; working-file content wins over staged content.
 - Support optional file/directory selection relative to the supplied invocation
   directory, including names with spaces. Reject paths outside the repository.
@@ -65,7 +66,7 @@ staging decisions intact.
 Settled capture policies are specified in [architecture](architecture.md): snapshots
 start from HEAD; unselected paths retain HEAD content; parent stacks roll over after
 HEAD changes; strict versioned metadata guards owned refs; a fixed noninteractive
-identity requires no user Git identity; ignored inclusion requires untracked inclusion.
+identity requires no user Git identity; tracked-only capture conflicts with ignored inclusion.
 Sparse worktrees, unmerged indexes, and gitlinks are explicitly unsupported for capture.
 
 ## History, status, and review data

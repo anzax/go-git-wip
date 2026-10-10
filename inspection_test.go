@@ -59,7 +59,7 @@ func TestInspectionHistoryRolloverAndReflog(t *testing.T) {
 	f.write("tracked.txt", "changed\n")
 	first := captureInspection(t, r, CaptureOptions{Message: "first edit"})
 	f.write("other file.txt", "other\n")
-	second := captureInspection(t, r, CaptureOptions{IncludeUntracked: true, Message: "second edit"})
+	second := captureInspection(t, r, CaptureOptions{Message: "second edit"})
 	history, err = r.History(ctx, HistoryOptions{})
 	if err != nil || len(history) != 3 {
 		t.Fatalf("history = %+v, %v", history, err)
@@ -144,7 +144,7 @@ func TestInspectionComparisonAndExactFileBytes(t *testing.T) {
 	if err := os.Rename(filepath.Join(f.dir, "rename-old.txt"), filepath.Join(f.dir, "rename-new.txt")); err != nil {
 		t.Fatal(err)
 	}
-	current := captureInspection(t, r, CaptureOptions{IncludeUntracked: true})
+	current := captureInspection(t, r, CaptureOptions{})
 	// These commands fail if Git invokes a configured external diff or textconv.
 	f.write(".git/info/attributes", "binary.dat diff=unsafe\n")
 	f.git("config", "diff.external", "false")

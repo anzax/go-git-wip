@@ -38,13 +38,15 @@ type RepositoryInfo struct {
 
 // CaptureOptions selects working files over a fresh HEAD tree. Paths are literal
 // paths relative to the directory passed to Open; an empty list selects all paths.
-// IncludeIgnored requires IncludeUntracked. Baseline forces creation even unchanged.
+// Tracked and non-ignored untracked files are included by default. TrackedOnly
+// excludes untracked files and conflicts with IncludeIgnored. Baseline forces
+// creation even unchanged.
 type CaptureOptions struct {
-	Paths            []string `json:"paths,omitempty"`
-	IncludeUntracked bool     `json:"include_untracked"`
-	IncludeIgnored   bool     `json:"include_ignored"`
-	Baseline         bool     `json:"baseline"`
-	Message          string   `json:"message,omitempty"`
+	Paths          []string `json:"paths,omitempty"`
+	TrackedOnly    bool     `json:"tracked_only"`
+	IncludeIgnored bool     `json:"include_ignored"`
+	Baseline       bool     `json:"baseline"`
+	Message        string   `json:"message,omitempty"`
 }
 
 // CaptureResult describes a published checkpoint or a successful no-change result.

@@ -14,8 +14,9 @@ cd examples/workflow && go run .
 
 Its separate Go module uses a local `replace` to test this checkout's public API.
 The example creates and removes an isolated temporary repository, so running it does
-not change an existing working tree. It creates a baseline, captures an edit, verifies
-a no-change result, lists history, compares two full commit IDs, and checks cancellation.
+not change an existing working tree. It creates a baseline, captures an edit and a
+newly created file, verifies a no-change result, lists history, compares two full
+commit IDs, and checks cancellation.
 
 ## Capture and review
 
@@ -45,11 +46,12 @@ on no-change, `Parent`, `Ref`, and `HEAD` still describe the operation.
 When `Created` is true, pass `Commit` to `Inspect` to compare it against its parent,
 or use `Compare` with two explicit commit IDs selected from history.
 
-Capture includes tracked edits and deletions, including staged additions. Working
-content takes precedence over staged content without changing the real index bytes
-or staging decisions. `IncludeUntracked` adds untracked files; `IncludeIgnored`
-requires it as well. Ignored files are excluded by default. Selection never bypasses
-eligibility, and included files are not checked for secrets.
+Capture includes tracked edits/deletions and non-ignored untracked files by default,
+including staged additions. Working content takes precedence over staged content
+without changing the real index bytes or staging decisions. `TrackedOnly` excludes
+untracked files; `IncludeIgnored` adds ignored files and conflicts with `TrackedOnly`.
+These rules also apply to forced baselines. Selection never bypasses eligibility,
+and included files are not checked for secrets.
 
 `Paths` are literal files or directories relative to the directory passed to `Open`.
 An empty list selects the whole repository. Outside-root paths and paths through

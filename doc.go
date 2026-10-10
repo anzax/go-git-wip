@@ -2,8 +2,11 @@
 //
 // Open targets an explicit repository directory. Capture uses a private index
 // and conditional refs/wip/<branch> updates, preserving HEAD, normal branch refs,
-// the real index, and working files. History, Compare, and ReadFile expose review
-// data; Delete and Cleanup manage owned refs with observed-tip checks.
+// the real index, and working files. Tracked and non-ignored untracked files are
+// captured by default; TrackedOnly excludes untracked files, and IncludeIgnored
+// explicitly includes ignored files. Those options conflict.
+// History, Compare, and ReadFile expose review data; Delete and Cleanup manage
+// owned refs with observed-tip checks.
 //
 // All operations accept context and return structured results and errors. The
 // library invokes local Git without prompts, terminal output, process-wide

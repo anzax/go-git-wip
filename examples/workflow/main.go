@@ -99,7 +99,11 @@ func run(ctx context.Context) error {
 	if err := os.WriteFile(file, []byte("initial\nedited\n"), 0600); err != nil {
 		return err
 	}
-	saved, err := repository.Capture(ctx, wip.CaptureOptions{Message: "edit note"})
+	// Newly created, non-ignored files are included without an extra option.
+	if err := os.WriteFile(filepath.Join(root, "new.txt"), []byte("new file\n"), 0600); err != nil {
+		return err
+	}
+	saved, err := repository.Capture(ctx, wip.CaptureOptions{Message: "edit note and add file"})
 	if err != nil {
 		return err
 	}
@@ -126,8 +130,9 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	want := wip.FileChange{Path: "note.txt", Status: "M", Added: 1}
-	if comparison.From != from || comparison.To != to || len(comparison.Files) != 1 || comparison.Files[0] != want {
+	wantNew := wip.FileChange{Path: "new.txt", Status: "A", Added: 1}
+	wantEdit := wip.FileChange{Path: "note.txt", Status: "M", Added: 1}
+	if comparison.From != from || comparison.To != to || len(comparison.Files) != 2 || comparison.Files[0] != wantNew || comparison.Files[1] != wantEdit {
 		return fmt.Errorf("unexpected comparison: %+v", comparison)
 	}
 	info, err := repository.Info(ctx)
@@ -143,8 +148,11 @@ func run(ctx context.Context) error {
 	if _, err := repository.Status(cancelled); !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("expected cancellation, got %v", err)
 	}
-	fmt.Printf("Baseline: %s\nCapture:  %s\nNo changes: verified\n%s %s +%d -%d\nCancellation: verified\n",
-		from, to, want.Status, want.Path, want.Added, want.Deleted)
+	fmt.Printf("Baseline: %s\nCapture:  %s\nNo changes: verified\n", from, to)
+	for _, change := range comparison.Files {
+		fmt.Printf("%s %s +%d -%d\n", change.Status, change.Path, change.Added, change.Deleted)
+	}
+	fmt.Println("Cancellation: verified")
 	return nil
 }
 

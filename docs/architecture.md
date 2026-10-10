@@ -62,9 +62,10 @@ A in the second checkpoint. This keeps omitted paths predictable.
 Tracked eligibility is the union of HEAD paths and real-index paths: staged additions
 count as tracked, staged deletion does not hide a still-existing working file, and
 working-file content always wins over staged content. Missing eligible paths are
-removed. Untracked files are included only by `IncludeUntracked`; ignored untracked
-files additionally require `IncludeIgnored`. Asking for ignored files without
-untracked files is invalid. Explicit path selection never bypasses these policies.
+removed. Non-ignored untracked files are included by default; `TrackedOnly` excludes
+them. Ignored untracked files require `IncludeIgnored`, which conflicts with
+`TrackedOnly`. These rules also apply to forced baselines. Explicit path selection
+never bypasses these policies.
 An empty path list selects the whole repository. Selected directories match their
 contents, including deleted tracked descendants. Outside-root paths and paths through
 symlink directories are rejected; a tracked symlink itself is a normal Git entry.

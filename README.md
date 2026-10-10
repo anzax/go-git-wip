@@ -20,8 +20,8 @@ make example
 ```
 
 It imports `github.com/anzax/go-git-wip`, creates an isolated temporary repository,
-captures a baseline and an edit, verifies unchanged capture, compares two history
-IDs, checks cancellation, and removes its repository. See the
+captures a baseline, an edit, and a newly created file, verifies unchanged capture,
+compares two history IDs, checks cancellation, and removes its repository. See the
 [consumer source](examples/workflow/main.go) and [library guide](docs/library.md).
 
 Build and use the CLI with your own repository:
@@ -51,9 +51,10 @@ is unset, Go installs into the first `GOPATH` entry's `bin` directory (normally
 
 ## Capture and history policies
 
-- Tracked working content is captured by default, including staged additions.
-  Untracked files require explicit inclusion; ignored files require both untracked
-  and ignored inclusion. Selecting a path never overrides these policies.
+- Tracked working content and non-ignored untracked files are captured by default,
+  including staged additions. Use `--tracked-only` to exclude untracked files or
+  `--ignored` to include ignored files; these flags conflict. Selecting a path never
+  overrides these policies.
 - Every snapshot starts from HEAD. In partial captures, unselected paths keep HEAD
   content. An unchanged capture succeeds without creating a commit; a baseline
   forces creation.

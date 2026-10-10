@@ -27,8 +27,11 @@ commit syntax; JSON object IDs returned by the library are always full IDs.
 | `cleanup REF=TIP [REF=TIP...] --yes` | Conditionally delete only the supplied, still-orphaned refs |
 | `version`, `--version`, `-v` | Print the build version |
 
-`save` accepts `--baseline`, `--untracked`, `--ignored`, and `--message/-m TEXT`.
-Ignored inclusion requires `--untracked`; explicit paths never override eligibility.
+`save` accepts `--baseline`, `--tracked-only`, `--ignored`, and `--message/-m TEXT`.
+Default saves include tracked and non-ignored untracked files. `--tracked-only`
+excludes untracked files while retaining staged additions. `--ignored` also includes
+ignored files and conflicts with `--tracked-only`. Explicit paths never override
+eligibility. These rules also apply to forced baselines.
 Baseline forces a checkpoint even when the tree is unchanged. Every snapshot starts
 from HEAD, so a partial capture leaves unselected paths at HEAD content, not at the
 previous checkpoint's content. Unchanged ordinary capture succeeds without a commit.
@@ -123,8 +126,9 @@ around publication may require inspecting the ref before retrying.
 
 The runnable example imports only `github.com/anzax/go-git-wip` and standard-library
 packages. It creates its own disposable Git working tree, opens it with a cancellable
-context, creates a baseline, edits a file, captures it, and demonstrates an unchanged
-capture. It lists history, chooses two returned full commit IDs, and obtains their
+context, creates a baseline, edits a file, creates another, captures both, and
+demonstrates an unchanged capture. It lists history, chooses two returned full
+commit IDs, and obtains their
 structured comparison. Setup uses explicit Git argument arrays and an isolated
 identity/configuration; it never mutates a caller's existing repository. Show error
 handling with `errors.As` for `*wip.Error` and `errors.Is` for cancellation. Keep the

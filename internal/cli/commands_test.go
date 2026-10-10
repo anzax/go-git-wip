@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -150,11 +151,54 @@ func TestCommandsJSONWorkflowAndHumanNoChange(t *testing.T) {
 	}
 }
 
+func TestSaveEligibilityJSONAndHelp(t *testing.T) {
+	for _, baseline := range []bool{false, true} {
+		for _, mode := range []struct {
+			name string
+			args []string
+			want []string
+		}{
+			{name: "default", want: []string{".gitignore", "added.txt", "new.txt", "tracked.txt"}},
+			{name: "tracked-only", args: []string{"--tracked-only"}, want: []string{".gitignore", "added.txt", "tracked.txt"}},
+			{name: "ignored", args: []string{"--ignored"}, want: []string{".gitignore", "added.txt", "ignored.txt", "new.txt", "tracked.txt"}},
+			{name: "selected-new", args: []string{"new.txt"}, want: []string{".gitignore", "new.txt", "tracked.txt"}},
+		} {
+			t.Run(fmt.Sprintf("%s/baseline=%v", mode.name, baseline), func(t *testing.T) {
+				f := newFixture(t)
+				f.write(".gitignore", []byte("ignored.txt\n"))
+				f.git("add", ".gitignore")
+				f.git("commit", "-m", "ignore policy")
+				for _, path := range []string{"added.txt", "new.txt", "ignored.txt"} {
+					f.write(path, []byte("new content\n"))
+				}
+				f.git("add", "added.txt")
+				args := append([]string{}, mode.args...)
+				if baseline {
+					args = append(args, "--baseline")
+				}
+				saved := save(t, f, args...)
+				if !saved.Created || f.git("ls-tree", "--name-only", saved.Commit) != strings.Join(mode.want, "\n") {
+					t.Fatalf("unexpected saved content: %+v", saved)
+				}
+				repeated := save(t, f, mode.args...)
+				if repeated.Created || repeated.Commit != "" || repeated.Parent != saved.Commit {
+					t.Fatalf("unexpected repeated save: %+v", repeated)
+				}
+			})
+		}
+	}
+	f := newFixture(t)
+	code, out, diagnostic := invoke(f, "save", "--help")
+	if code != 0 || diagnostic != "" || !strings.Contains(out, "--tracked-only") || !strings.Contains(out, "non-ignored untracked") || strings.Contains(out, "--untracked") {
+		t.Fatalf("save help = %d, %q, %q", code, out, diagnostic)
+	}
+}
+
 func TestFileExactBinaryAndJSON(t *testing.T) {
 	f := newFixture(t)
 	content := []byte{0, 1, 255, '\n', 'x'}
 	f.write("binary data.bin", content)
-	checkpoint := save(t, f, "--untracked")
+	checkpoint := save(t, f)
 	code, out, diagnostic := invoke(f, "file", checkpoint.Commit, "binary data.bin")
 	if code != 0 || diagnostic != "" || !bytes.Equal([]byte(out), content) {
 		t.Fatalf("raw file = %d, %q, %q", code, out, diagnostic)
@@ -217,14 +261,14 @@ func TestDeletionApprovalConflictAndPartialCleanup(t *testing.T) {
 
 func TestUsageAndCancellationDiagnostics(t *testing.T) {
 	f := newFixture(t)
-	for _, args := range [][]string{{"unknown", "--json"}, {"--bad-flag", "--json"}, {"diff", "--json"}, {"history", "--limit", "-1", "--json"}, {"save", "--ignored", "--json"}} {
+	for _, args := range [][]string{{"unknown", "--json"}, {"--bad-flag", "--json"}, {"diff", "--json"}, {"history", "--limit", "-1", "--json"}, {"save", "--tracked-only", "--ignored", "--json"}, {"save", "--untracked", "--json"}} {
 		code, out, diagnostic := invoke(f, args...)
 		if code != 2 || out != "" || !strings.Contains(diagnostic, `"kind":"usage"`) || strings.Count(diagnostic, "\n") != 1 {
 			t.Fatalf("usage %q = %d, %q, %q", args, code, out, diagnostic)
 		}
 	}
-	code, out, diagnostic := invoke(f, "save", "-m", "--json", "--ignored")
-	if code != 2 || out != "" || json.Valid([]byte(diagnostic)) || !strings.Contains(diagnostic, "--ignored requires --untracked") {
+	code, out, diagnostic := invoke(f, "save", "-m", "--json", "--tracked-only", "--ignored")
+	if code != 2 || out != "" || json.Valid([]byte(diagnostic)) || !strings.Contains(diagnostic, "--tracked-only and --ignored cannot be combined") {
 		t.Fatalf("message mistaken for a JSON flag: %d, %q, %q", code, out, diagnostic)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
