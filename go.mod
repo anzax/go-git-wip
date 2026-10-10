@@ -1,4 +1,4 @@
-module go-git-wip
+module github.com/anzax/go-git-wip
 
 go 1.26.2
 

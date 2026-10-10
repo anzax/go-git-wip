@@ -1,53 +1,157 @@
 # Architecture
 
-Status: implementation direction; exported operation types are not defined yet.
+Public package `wip` implements native Git checkpoints. The module is
+`github.com/anzax/go-git-wip`; the library uses the standard library and local Git
+2.30 or newer. Linux and macOS are supported targets; actual validation platforms
+are recorded in task verification. The CLI owns Cobra, presentation, confirmation,
+and exit codes. There is no database or alternative Git backend.
 
-## Library first
+## Public contract
 
-Public package `wip` owns repository discovery, checkpoint capture, status/history,
-revision comparisons, file reads, and ref deletion/cleanup. Methods accept context and an explicit repository location;
-results carry object IDs and metadata. An unchanged capture is a normal result.
-The library does not import Cobra or interact with a terminal.
+`Open(ctx, directory)` returns a `*Repository` anchored to an explicit invocation
+directory and its working tree. It accepts subdirectories and attached, detached,
+or unborn working trees; bare repositories are unsupported. Capture requires an
+attached local branch with a commit. Repository state is read anew for each operation.
+All operations accept a context, and all returned object IDs are full IDs.
 
-Keep Git execution private and small: command directory, cancellation, argument
-arrays, controlled environment overrides, captured stderr, and useful errors. Use
-concrete implementation types instead of a general Git backend abstraction. Tests
-exercise real repositories rather than a mock object database.
+| Method | Result and purpose |
+| --- | --- |
+| `Info(ctx)` | `RepositoryInfo`: invocation directory, root, Git directory, branch, HEAD |
+| `Capture(ctx, CaptureOptions)` | `CaptureResult`: publication or successful no-change |
+| `Status(ctx)` | `Status`: current branch, checkpoint tip/base, active-history flag |
+| `History(ctx, HistoryOptions)` | `[]Checkpoint`: newest first along one owned stack |
+| `Refs(ctx)` | `[]RefInfo`: lexicographically sorted owned refs, including orphans |
+| `Reflog(ctx, ref, limit)` | `[]ReflogEntry`: retained records, newest first |
+| `Inspect(ctx, revision, CompareOptions)` | `Comparison`: owned checkpoint versus its parent |
+| `Compare(ctx, from, to, CompareOptions)` | `Comparison`: arbitrary explicit commit revisions |
+| `ReadFile(ctx, revision, path)` | `[]byte`: exact blob contents, including binary files |
+| `Delete(ctx, DeleteOptions)` | `DeleteResult`: conditional deletion of one owned ref |
+| `Cleanup(ctx, []DeleteOptions)` | `CleanupResult`: explicit orphan targets and partial failures |
 
-The CLI handles command parsing, human/JSON output, prompts, and exit codes. No arguments shows
-help. Its UX can evolve independently from the library's operation names.
+Each method also returns `error`. `Error.Kind` is the stable classification;
+`errors.As` exposes its details and `errors.Is` retains context cancellation through
+`Unwrap`. Git stderr is diagnostic material, never a parsing contract. Repository
+values can be reused concurrently, but mutation conflicts are reported rather than
+serialized by a process-local lock. Callers must not mutate option slices during use.
 
-## Git transaction direction
+History defaults to the current branch's tip even if stale; its checkpoint metadata
+identifies the old base. An explicit revision selects an older stack, including a
+reflog-discovered tip. Traversal stops before the normal base commit. Zero limits
+mean unlimited; negative limits are invalid. A missing current checkpoint ref gives
+empty history/reflog data and an inactive status, not an error. Detached/unborn
+status has no active history; branch-independent reads and ref listing still work.
+History filters retain checkpoints whose parent comparison touches a selected path;
+the limit applies to matching checkpoints. Reflog records retain duplicates and
+identify them with their ordinal selectors. Git reflog expiry still applies.
 
-Use documented Git plumbing to create snapshots:
+Comparisons disable rename detection, external diff and text conversion. Structured
+changes expose A/M/D/T, path, added/deleted lines and binary status; renames are a
+separate deletion and addition. Optional textual patches are separate from those
+records. Revision inputs resolve to commits before use; option-like revision strings
+must never become Git command options. Paths are literal, not Git pathspec programs.
+A historical file read resolves an exact repository-relative blob path and does not
+follow stored symlinks; a symlink yields its stored target bytes.
 
-1. Discover the repository, resolve its branch and HEAD, and inspect the checkpoint
-   ref. Select the snapshot base and parent according to our documented policy.
-2. Allocate a private temporary index and load the chosen tree with `read-tree`.
-3. Apply working-tree changes according to explicit capture/path options using Git
-   with `GIT_INDEX_FILE`. Never write the real index.
-4. Run `write-tree`; identify a no-change result unless baseline creation was requested.
-5. Create the checkpoint using `commit-tree`, then publish it through
-   `update-ref --create-reflog` with an expected previous value. A competing update
-   must fail without silently replacing the winner.
-6. Remove the temporary index on every exit path.
+## Capture transaction
 
-Validate plumbing against official Git documentation during implementation. Specify
-capture base, parent selection, identity, and existing-ref validation in requirements
-before writing these steps. Snapshot content and parent choice are separate decisions.
-Guard against inherited Git environment variables redirecting repository/index access.
-Avoid implicit interactive signing or hooks in library operations.
+Every capture starts from the current **HEAD tree**, including partial captures.
+Unselected paths therefore contain HEAD content. Partial checkpoints are independent
+snapshots, not cumulative patches: capturing A then only B records HEAD's version of
+A in the second checkpoint. This keeps omitted paths predictable.
 
-## Embedding example
+Tracked eligibility is the union of HEAD paths and real-index paths: staged additions
+count as tracked, staged deletion does not hide a still-existing working file, and
+working-file content always wins over staged content. Missing eligible paths are
+removed. Untracked files are included only by `IncludeUntracked`; ignored untracked
+files additionally require `IncludeIgnored`. Asking for ignored files without
+untracked files is invalid. Explicit path selection never bypasses these policies.
+An empty path list selects the whole repository. Selected directories match their
+contents, including deleted tracked descendants. Outside-root paths and paths through
+symlink directories are rejected; a tracked symlink itself is a normal Git entry.
+Sparse working trees, unmerged indexes, and gitlinks/submodules are unsupported for
+capture until their semantics receive dedicated tests.
 
-An application creates a baseline, performs work, saves a checkpoint, reads history,
-and hands an explicit pair of SHAs to an external reviewer. The caller owns reviewer
-processes, sessions, hooks, and task attribution. Filtering a review does not imply
-filtering a checkpoint.
+1. Read the local branch, full HEAD ID, and direct checkpoint ref. Reject symbolic
+   checkpoint refs, invalid names, and unrelated existing commit targets.
+2. The parent is the existing owned tip if its recorded base equals HEAD; otherwise
+   the parent is HEAD. A changed HEAD starts a new stack at publication, retaining
+   the old tip only through the reflog under normal Git retention rules.
+3. Create a private temporary index and read HEAD's tree into it. Enumerate eligible
+   paths with NUL-delimited Git plumbing, intersect literal selection, and apply the
+   working content/deletions only for those paths. Never write or refresh the real
+   index. Do not construct shell commands.
+4. Write the resulting tree. Compare it against the chosen parent's tree. Equal
+   trees return `Created=false`, empty `Commit`, and the observed parent/ref/HEAD,
+   without changing the ref. `Baseline=true` forces a commit even when equal.
+5. `commit-tree` creates a single-parent commit. Publish with an expected old tip
+   (or expected absence), `--no-deref`, and a reflog. Verify the observed work-branch
+   OID in the publication transaction where supported. A competing tip update
+   returns `KindConflict` and is never overwritten.
+6. Remove the private index and its lock/temp directory on every return path.
 
-Normal commits and temporary checkpoint history have separate lifecycles. Document
-how branch changes affect the active history and which older commits remain reachable.
-Do not promise backup retention beyond Git's ref/reflog and garbage collection rules.
+Identity is deliberately deterministic: author and committer are `WIP checkpoint
+<wip@localhost>`, with Git's current timestamp. No user identity configuration is
+required. The default message is `Checkpoint`, or `Baseline` when requested.
+Commit signing and hooks, including reference-transaction hooks, are disabled for
+library commands. Git attributes and clean filters still affect captured content
+like ordinary Git staging; callers control repository filter configuration.
 
-Keep workflow engines, watchers, diff renderers, and review-tool integrations outside
-this library. Add the executable embedding example once the operations exist.
+Before success, check that HEAD still denotes the observed branch and commit.
+Conditional ref publication protects concurrent checkpoint writers and observed
+branch OIDs, but no portable Git operation atomically locks symbolic HEAD, index,
+and every working file. External branch switches or working writes during capture
+are unsupported races; this library does not promise an atomic filesystem snapshot.
+A cancellation or process termination around publication can leave the ref updated
+without a success response; inspect the ref before retrying. Unreachable objects
+from abandoned captures are harmless and left for Git's ordinary maintenance.
+
+## Owned storage and deletion
+
+Refs use `refs/wip/<short-local-branch>`, including slash-containing branch names.
+The raw commit message has an exact first-line marker and JSON object, a blank line,
+then the caller's message:
+
+```text
+go-git-wip:1 {"branch":"main","base":"FULL_OBJECT_ID"}
+
+Checkpoint
+```
+
+Decode the envelope strictly, require the matching branch, a valid full base commit
+ID, and exactly one parent. The tip's parent must be its base or another owned
+checkpoint with the same branch/base. Capture only needs this bounded local
+validation; history validates every traversed entry and its boundary. The API
+strips the envelope from `Checkpoint.Message`. Unknown versions, malformed metadata,
+wrong branch/base, noncommit refs, and symbolic refs are errors, never overwritten
+or deleted. This protocol detects accidental collisions; it is not a cryptographic
+ownership or trust boundary against someone who can write Git objects and refs.
+Ref listing fails explicitly on an invalid entry rather than silently hiding it.
+
+Deletion requires an explicit complete checkpoint ref and observed `ExpectedTip`.
+Validate ownership before conditional removal. A missing ref is a successful
+`Deleted=false`, while a changed tip is `KindConflict`. Normal branches, HEAD,
+index, and working files remain untouched. Ref deletion can remove its reflog.
+Cleanup accepts only explicitly supplied targets that are still orphaned (their
+normal branches do not exist); it never selects all refs implicitly. Each failed
+entry appears in `Failures`, successful removals in `Deleted`. Individual target
+failures do not produce a top-level error; cancellation or repository-wide failure
+returns both the partial result and an error. This is not an atomic batch, and a
+normal branch can be recreated concurrently. No automatic garbage collection occurs.
+
+## Git execution boundary
+
+Use `exec.CommandContext`, argument arrays and explicit command directories.
+Preserve normal Git configuration while stripping inherited variables capable of
+redirecting the repository, index, namespace, object storage, or injected command
+configuration. Supply operation-specific index and identity overrides explicitly.
+Disable optional index writes, fsmonitor, signing, hooks, external diff, textconv,
+and interactive prompting where applicable. Capture stderr privately. NUL-delimited
+output protects filenames containing spaces, tabs, and newlines. Do not assume SHA-1
+length: derive and validate full object IDs for the repository's object format.
+
+Keep the implementation concrete: one repository type and private execution helpers,
+not a backend interface or command framework. Tests use real temporary repositories
+with isolated Git identity/configuration and assert exact object/tree/index behavior.
+The embedding example owns its workflow and cancellation; review tools, daemons,
+watchers, restore operations, hook installers, and editor integration stay outside
+this library.

@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"go-git-wip/internal/cli"
+	"github.com/anzax/go-git-wip/internal/cli"
 )
 
 var version = "dev"

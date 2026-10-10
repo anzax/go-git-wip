@@ -29,9 +29,8 @@ verified through the Go module proxy's `@latest` on 2026-10-10, with Cobra also
 checked against its [release page](https://github.com/spf13/cobra/releases/tag/v1.10.2).
 The reusable library will use the standard library and local Git.
 
-The module path and executable name `go-git-wip` are provisional. The executable
-has a distinct name from git-wip. Set the final import path before publication;
-local consumers can use `go.work` or a module `replace` directive.
+The module is `github.com/anzax/go-git-wip`; the executable is `go-git-wip`.
+Supported platforms are Linux and macOS. Validation runs on Linux only.
 
 ## Project map
 

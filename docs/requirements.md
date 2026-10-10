@@ -1,8 +1,8 @@
 # Checkpoint requirements
 
-Status: implementation scope. Only the CLI bootstrap exists today. This document
-defines the desired library and CLI behavior; exported names and unresolved policies
-are finalized in the foundation task before the corresponding implementation.
+Status: implementation contract. The settled public API and storage policies are
+defined in [architecture](architecture.md); task records track implemented behavior
+and validation separately.
 
 ## Purpose and boundaries
 
@@ -39,8 +39,8 @@ A checkpoint contains working-file content while leaving the user's workspace an
 staging decisions intact.
 
 - Capture tracked modifications and deletions by default. Support explicit inclusion
-  of untracked and ignored files; ignored files remain excluded by default. Specify
-  how staged additions count as tracked before implementing capture.
+  of untracked and ignored files; ignored files remain excluded by default.
+  Staged additions count as tracked; working-file content wins over staged content.
 - Support optional file/directory selection relative to the supplied invocation
   directory, including names with spaces. Reject paths outside the repository.
   Selecting a path must not silently override ignored/untracked capture policy.
@@ -62,11 +62,11 @@ staging decisions intact.
   around publication may require the caller to inspect the ref before retrying.
   Do not promise an atomic snapshot while other processes modify working files.
 
-Before implementing capture, settle and document: snapshot base and preservation of
-unselected paths; parent selection and stack rollover after HEAD changes; treatment
-of existing checkpoint refs; default identity; and tracked/untracked/ignored option
-interactions. Keep these as explicit product decisions rather than accidental Git
-subprocess behavior.
+Settled capture policies are specified in [architecture](architecture.md): snapshots
+start from HEAD; unselected paths retain HEAD content; parent stacks roll over after
+HEAD changes; strict versioned metadata guards owned refs; a fixed noninteractive
+identity requires no user Git identity; ignored inclusion requires untracked inclusion.
+Sparse worktrees, unmerged indexes, and gitlinks are explicitly unsupported for capture.
 
 ## History, status, and review data
 
@@ -151,10 +151,10 @@ repositories. Run formatting, vet, tests, and build; run race tests when support
 Perform an independent code review for correctness, readability, modularity, and
 unnecessary complexity, then resolve findings before task commits.
 
-Target Linux and macOS initially; record actual test platforms separately from intended
-support. Windows support is deferred. The final module path and minimum supported Git
-version must be chosen and documented before publication. Current verification covers
-only the bootstrap on Linux/arm64, not checkpoint operations or macOS execution.
+Support Linux and macOS only; record actual test platforms separately from intended
+support. Windows is outside the project scope. The module is `github.com/anzax/go-git-wip` and the minimum supported Git
+version is 2.30. Task records identify actual validation; macOS execution must not
+be claimed unless separately tested.
 
 Do not build a daemon, watcher, workflow engine, review UI, editor plugin, hook
 installer, automatic restore operation, or exhaustive Git feature matrix in this scope.

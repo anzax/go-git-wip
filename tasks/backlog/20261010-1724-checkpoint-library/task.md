@@ -1,6 +1,6 @@
 ---
 title: Implement independent Git checkpoint library and CLI
-status: ready
+status: active
 updated: '2026-10-10'
 ---
 
@@ -12,9 +12,9 @@ runnable embedding example. Follow [requirements](../../../docs/requirements.md)
 
 ## Scope and acceptance
 
-- [ ] Define capture-base/parent policies, baseline creation, existing-ref validation,
+- [x] Define capture-base/parent policies, baseline creation, existing-ref validation,
   identity, and path-selection semantics before exposing the operation API.
-- [ ] Implement private Git execution and repository discovery with cancellation.
+- [x] Implement private Git execution and repository discovery with cancellation.
 - [ ] Implement capture with a private index, explicit options, no-change results,
   reflogs, conditional ref updates, and preservation assertions.
 - [ ] Implement structured status/history, checkpoint inspection, file changes,
@@ -37,7 +37,8 @@ verification. This task tracks the overall outcome.
 3. History, inspection, deletion, and cleanup.
 4. CLI, embedding example, and end-to-end validation/documentation.
 
-Use GPT-6.1 Sol at high reasoning for implementation/review. Limit concurrency to
+Use GPT-6 Astra at medium reasoning for design/contracts and design review;
+use GPT-6.1 Sol at high reasoning for mechanical implementation/validation. Limit concurrency to
 two subagents with disjoint writable scopes; serialize integration and commits.
 Supply focused project requirements and Git documentation.
 
@@ -46,16 +47,16 @@ Supply focused project requirements and Git documentation.
 No full compatibility claim, copied/adapted upstream code or tests, general Git
 backend framework, daemon, watcher, workflow engine, review UI, or hook installer.
 Comparisons with another executable are optional design evidence, not release gates.
-Choose a final module path and minimum Git version before publication. Target Linux
-and macOS initially; report actual platform checks and defer Windows support.
+Module: `github.com/anzax/go-git-wip`. Choose and document the minimum Git version.
+Support Linux and macOS only; validate on the Linux host.
 
 ## Verification
 
-Not started. Use disposable repositories, isolated Git configuration/identity, and
+Astra settled design/contracts and reviewed the foundation; make check/build passed. Use disposable repositories, isolated Git configuration/identity, and
 original tests from the behavior contract. Compare tree contents, ancestry, refs,
 reflogs, and state preservation with Git itself. No C++ toolchain is required.
 
 ## Resume
 
-Start the behavior/foundation slice. Resolve the open capture policies in
-requirements, then design the smallest useful public API and original test fixtures.
+Foundation complete. Next: Sol implements capture against the settled contracts;
+Astra reviews design/correctness before the capture commit.

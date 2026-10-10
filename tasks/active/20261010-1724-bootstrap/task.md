@@ -51,4 +51,4 @@ unverified. Checkpoint behavior is unverified because it is not implemented yet.
 
 Bootstrap complete. Next:
 [implement checkpoint library](../../backlog/20261010-1724-checkpoint-library/task.md).
-The final module hosting path remains undecided.
+The implementation task now uses `github.com/anzax/go-git-wip`.

@@ -29,10 +29,14 @@ Read README.md, the current task, and docs/requirements.md before implementation
   distinguish scaffold verification from implemented checkpoint behavior.
 - Review correctness, readability, modularity, and unnecessary complexity before
   completion. Keep tasks current and document material limitations.
-- Implementation delegation uses GPT-6.1 Sol with high reasoning, at most two
-  concurrent subagents. Give agents focused project requirements and Git
-  documentation. Use disjoint writable scopes; serialize shared-file edits and
-  integration.
+- Software design and public contracts use GPT-6 Astra with medium reasoning.
+  Mechanical implementation and validation use GPT-6.1 Sol with high reasoning.
+  Run at most two concurrent subagents with focused requirements and Git documentation,
+  disjoint writable scopes, and serialized integration/commits.
+- Keep core docs, these instructions, and task resume points current as decisions
+  change so work can resume reliably after context compaction.
+- The module is `github.com/anzax/go-git-wip`. Support Linux and macOS only;
+  validate on this Linux host and do not imply macOS execution was tested.
 - Commit each completed, reviewed task separately when authorized. Preserve unrelated
   changes. Do not push, publish, install hooks, or modify other repositories as a
   side effect. Amend existing commits only when explicitly requested.
