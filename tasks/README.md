@@ -14,6 +14,7 @@ imply completion. Keep IDs unique and stable when moving tasks; repair incoming 
    that do not fit the current task. Avoid transcripts and routine command logs.
 4. Record checks actually run and limitations. Mark done only when criteria are met;
    use review when acceptance is pending. Put remaining work in a linked task.
+5. Move completed task directories to `archived` and repair incoming links.
 
 Keep artifacts with their task unless they are maintained project documentation.
 Use relative links; root is `../../../` from a task folder. No automatic checkpoints,
@@ -22,6 +23,6 @@ normal commits, hooks, or publication are part of this simplified workflow.
 Copy [_template.md](_template.md) to start a task. Find work with:
 
 ```sh
-rg --files tasks/active tasks/backlog
+rg --files tasks
 rg '^status:' tasks
 ```

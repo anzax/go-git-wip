@@ -26,6 +26,6 @@ redirection, hooks/signing suppression, cancellation, and workspace preservation
 
 ## Resume
 
-Foundation complete. Continue [capture](../../backlog/20261010-1800-capture/task.md).
+Foundation complete. Continue [capture](../20261010-1800-capture/task.md).
 Contracts live in requirements/architecture/types.go. Runner helpers are private
 `git`, `gitEnv`, and `gitExitCode`; each command uses an explicit directory.

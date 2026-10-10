@@ -50,5 +50,5 @@ unverified. Checkpoint behavior is unverified because it is not implemented yet.
 ## Resume
 
 Bootstrap complete. Next:
-[implement checkpoint library](../../backlog/20261010-1724-checkpoint-library/task.md).
+[implement checkpoint library](../20261010-1724-checkpoint-library/task.md).
 The implementation task now uses `github.com/anzax/go-git-wip`.
