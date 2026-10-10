@@ -1,6 +1,6 @@
 ---
 title: Inspect checkpoint history and manage refs
-status: ready
+status: done
 updated: '2026-10-10'
 ---
 
@@ -11,10 +11,15 @@ Follow [requirements](../../../docs/requirements.md) and [architecture](../../..
 
 ## Verification
 
-Pending implementation. Sol high performs mechanical coding/testing; Astra medium
-reviews design and contracts. Run meaningful Git assertions, make check, and make build.
-Commit the completed, reviewed slice separately.
+Implemented status/history/ref/reflog inspection, comparisons and raw file reads,
+conditional deletion and explicit orphan cleanup. Original Git tests cover current
+and stale stacks, reflog duplicate selectors, matching history limits, binary and
+symlink bytes, literal/unusual filenames, no external diff/textconv execution,
+orphan sorting, conflicts, partial cleanup and workspace preservation.
+Astra medium independently reviewed contracts, correctness and modularity; no
+blocking findings remain. `make check`, `make build` and `git diff --check` pass
+on Linux/arm64 (Go 1.27.2, Git 2.56.0).
 
 ## Resume
 
-Wait for the repository foundation and dependent operations.
+Library operations complete. Next: [CLI and embedding](../20261010-1820-cli-embedding/task.md).

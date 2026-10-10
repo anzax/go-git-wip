@@ -8,8 +8,8 @@ Go applications. Git operations use the local Git executable.
 The library and optional CLI have their own API and behavior. Compatibility with
 git-wip is not a goal; command names, options, and storage policies may evolve.
 
-**Status: library implementation in progress.** Repository discovery and capture
-are implemented and tested. The CLI currently supports help and version; the full
+**Status: library implemented and tested.** Capture, history, comparison, file reads,
+and ref management are available. The CLI currently supports help and version; the full
 command adapter and embedding example follow in the next task slices.
 
 ## Development

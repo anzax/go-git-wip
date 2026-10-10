@@ -17,7 +17,7 @@ runnable embedding example. Follow [requirements](../../../docs/requirements.md)
 - [x] Implement private Git execution and repository discovery with cancellation.
 - [x] Implement capture with a private index, explicit options, no-change results,
   reflogs, conditional ref updates, and preservation assertions.
-- [ ] Implement structured status/history, checkpoint inspection, file changes,
+- [x] Implement structured status/history, checkpoint inspection, file changes,
   explicit revision-pair comparison, historical file reads, ref listing/deletion,
   and orphan cleanup.
 - [ ] Design and wire a small CLI with explicit write commands, human/JSON output,
@@ -58,5 +58,5 @@ reflogs, and state preservation with Git itself. No C++ toolchain is required.
 
 ## Resume
 
-Foundation and capture complete. Inspection code passes tests and design review;
-next commit it separately, then deliver CLI and embedding workflow.
+Library operations complete and reviewed. Deliver CLI, external embedding workflow,
+final documentation and end-to-end Linux validation.
