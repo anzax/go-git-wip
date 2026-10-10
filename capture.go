@@ -169,6 +169,18 @@ func (r *Repository) capturePaths(ctx context.Context, head string, options Capt
 			addNULPaths(eligible, ignored)
 		}
 	}
+	for _, selection := range selections {
+		matched := false
+		for path := range eligible {
+			if pathSelected(path, []string{selection}) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return nil, &Error{Kind: KindInvalidOption, Op: "capture", Message: fmt.Sprintf("selection %q matches no eligible capture paths", selection)}
+		}
+	}
 	result := make([]string, 0, len(eligible))
 	for path := range eligible {
 		if pathSelected(path, selections) {

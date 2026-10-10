@@ -38,6 +38,8 @@ type RepositoryInfo struct {
 
 // CaptureOptions selects working files over a fresh HEAD tree. Paths are literal
 // paths relative to the directory passed to Open; an empty list selects all paths.
+// Each explicit path must match an eligible file or directory descendant, including
+// deleted tracked files; an unmatched selection returns KindInvalidOption.
 // Tracked and non-ignored untracked files are included by default. TrackedOnly
 // excludes untracked files and conflicts with IncludeIgnored. Baseline forces
 // creation even unchanged.

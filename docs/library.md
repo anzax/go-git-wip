@@ -54,7 +54,13 @@ These rules also apply to forced baselines. Selection never bypasses eligibility
 and included files are not checked for secrets.
 
 `Paths` are literal files or directories relative to the directory passed to `Open`.
-An empty list selects the whole repository. Outside-root paths and paths through
+An empty list selects the whole repository. Each explicit path must match an
+eligible file or directory descendant, including deleted tracked files. Unmatched
+selections return `KindInvalidOption`, including mixtures of valid and unmatched
+paths; ignored-only paths require `IncludeIgnored`, and untracked-only paths fail
+with `TrackedOnly`. These errors leave the checkpoint ref and workspace unchanged.
+Unchanged eligible files remain valid selections, but no-change depends on the
+complete proposed snapshot matching its parent. Outside-root paths and paths through
 symlink directories are rejected. Every snapshot starts from HEAD: capturing only B
 after capturing A stores HEAD's version of A in the new snapshot. Partial captures
 are independent snapshots rather than cumulative patches.

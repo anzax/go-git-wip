@@ -34,7 +34,12 @@ ignored files and conflicts with `--tracked-only`. Explicit paths never override
 eligibility. These rules also apply to forced baselines.
 Baseline forces a checkpoint even when the tree is unchanged. Every snapshot starts
 from HEAD, so a partial capture leaves unselected paths at HEAD content, not at the
-previous checkpoint's content. Unchanged ordinary capture succeeds without a commit.
+previous checkpoint's content. No path arguments select the whole repository. Every
+explicit path must match eligible content, including deleted tracked paths; a typo,
+excluded-only path, or mixed valid/unmatched selection fails with exit 2 and
+`invalid_option` in JSON diagnostics. Use `-m TEXT` for a checkpoint message; positional
+arguments are paths. An unchanged eligible file is valid, but no-change succeeds
+without a commit only when the complete proposed snapshot matches its parent.
 
 `history` and `reflog` accept `--limit N`; zero means unlimited and negative values
 are usage errors. `history`, `show`, and `diff` accept repeatable `--path PATH` filters.

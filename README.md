@@ -54,7 +54,8 @@ is unset, Go installs into the first `GOPATH` entry's `bin` directory (normally
 - Tracked working content and non-ignored untracked files are captured by default,
   including staged additions. Use `--tracked-only` to exclude untracked files or
   `--ignored` to include ignored files; these flags conflict. Selecting a path never
-  overrides these policies.
+  overrides these policies. Every explicit selection must match eligible content;
+  unmatched selections fail, including mixtures of valid paths and typos.
 - Every snapshot starts from HEAD. In partial captures, unselected paths keep HEAD
   content. An unchanged capture succeeds without creating a commit; a baseline
   forces creation.

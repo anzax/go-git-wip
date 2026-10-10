@@ -45,6 +45,10 @@ staging decisions intact.
 - Support optional file/directory selection relative to the supplied invocation
   directory, including names with spaces. Reject paths outside the repository.
   Selecting a path must not silently override ignored/untracked capture policy.
+  Each explicit selection must match at least one eligible path, including deleted
+  tracked files; reject unmatched selections even alongside valid ones. No paths
+  select the whole repository. Unchanged eligible files remain valid selections;
+  compare the complete proposed snapshot with its parent to determine no change.
 - Preserve HEAD, normal branch refs, index bytes, staged content, and working files.
   A partially staged file must remain partially staged with identical staged and
   working contents after capture. Do not use stash/reset/checkout to achieve this.

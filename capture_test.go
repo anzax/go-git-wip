@@ -212,7 +212,7 @@ func TestCaptureUntrackedIgnoredAndLiteralPaths(t *testing.T) {
 	if excluded.Created || excluded.Commit != "" {
 		t.Fatal("tracked-only capture included newly created files")
 	}
-	selected := captureFixture(t, r, CaptureOptions{Paths: []string{"untracked space.txt", "ignored secret.txt"}})
+	selected := captureFixture(t, r, CaptureOptions{Paths: []string{"untracked space.txt"}})
 	if !selected.Created || f.git("show", selected.Commit+":untracked space.txt") != "new" || strings.Contains(f.git("ls-tree", "--name-only", selected.Commit), "ignored secret") {
 		t.Fatal("selection did not include untracked file or bypassed ignored policy")
 	}
@@ -224,16 +224,14 @@ func TestCaptureUntrackedIgnoredAndLiteralPaths(t *testing.T) {
 	if got := f.git("ls-tree", "--name-only", literal.Commit); !strings.Contains(got, "literal[1].txt") || strings.Contains(got, "literal1.txt") || strings.Contains(got, "untracked space") {
 		t.Fatalf("literal selection expanded or retained unselected edits: %q", got)
 	}
-	tracked := captureFixture(t, r, CaptureOptions{TrackedOnly: true, Paths: []string{"untracked space.txt"}})
-	if f.git("rev-parse", tracked.Commit+"^{tree}") != f.git("rev-parse", "HEAD^{tree}") {
-		t.Fatal("explicit selection bypassed tracked-only policy")
-	}
+	_, err := r.Capture(context.Background(), CaptureOptions{TrackedOnly: true, Paths: []string{"untracked space.txt"}})
+	requireErrorKind(t, err, KindInvalidOption)
 	ignored := captureFixture(t, r, CaptureOptions{IncludeIgnored: true, Paths: []string{"ignored secret.txt"}})
 	if f.git("show", ignored.Commit+":ignored secret.txt") != "ignored" {
 		t.Fatal("explicit ignored inclusion did not include selected file")
 	}
 	tip, index := f.git("rev-parse", ignored.Ref), f.read(".git/index")
-	_, err := r.Capture(context.Background(), CaptureOptions{TrackedOnly: true, IncludeIgnored: true})
+	_, err = r.Capture(context.Background(), CaptureOptions{TrackedOnly: true, IncludeIgnored: true})
 	requireErrorKind(t, err, KindInvalidOption)
 	if f.git("rev-parse", ignored.Ref) != tip || !bytes.Equal(index, f.read(".git/index")) {
 		t.Fatal("invalid options changed checkpoint ref or index")

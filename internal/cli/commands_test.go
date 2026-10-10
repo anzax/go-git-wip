@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -191,6 +192,41 @@ func TestSaveEligibilityJSONAndHelp(t *testing.T) {
 	code, out, diagnostic := invoke(f, "save", "--help")
 	if code != 0 || diagnostic != "" || !strings.Contains(out, "--tracked-only") || !strings.Contains(out, "non-ignored untracked") || strings.Contains(out, "--untracked") {
 		t.Fatalf("save help = %d, %q, %q", code, out, diagnostic)
+	}
+}
+
+func TestSaveRejectsUnmatchedSelectionsWithJSON(t *testing.T) {
+	f := newFixture(t)
+	f.write(".gitignore", []byte("ignored.txt\n"))
+	f.git("add", ".gitignore")
+	f.git("commit", "-m", "ignore policy")
+	f.write("tracked.txt", []byte("checkpoint change\n"))
+	saved := save(t, f)
+	f.write("new.txt", []byte("new\n"))
+	f.write("ignored.txt", []byte("ignored\n"))
+	for _, test := range []struct {
+		args      []string
+		unmatched string
+	}{
+		{args: []string{"missing.txt"}, unmatched: "missing.txt"},
+		{args: []string{"tracked.txt", "missing.txt"}, unmatched: "missing.txt"},
+		{args: []string{"old-style message"}, unmatched: "old-style message"},
+		{args: []string{"ignored.txt"}, unmatched: "ignored.txt"},
+		{args: []string{"new.txt", "--tracked-only"}, unmatched: "new.txt"},
+		{args: []string{"missing.txt", "--baseline"}, unmatched: "missing.txt"},
+	} {
+		code, out, diagnostic := invoke(f, append([]string{"save", "--json"}, test.args...)...)
+		var failure struct {
+			Error struct{ Kind, Message string }
+		}
+		decode(t, diagnostic, &failure)
+		if code != 2 || out != "" || failure.Error.Kind != "invalid_option" || !strings.Contains(failure.Error.Message, strconv.Quote(test.unmatched)) || strings.Count(diagnostic, "\n") != 1 || f.git("rev-parse", saved.Ref) != saved.Commit {
+			t.Fatalf("unmatched selection %q = %d, %q, %q", test.args, code, out, diagnostic)
+		}
+	}
+	code, out, diagnostic := invoke(f, "save", "missing.txt")
+	if code != 2 || out != "" || !strings.Contains(diagnostic, `selection "missing.txt"`) || f.git("rev-parse", saved.Ref) != saved.Commit {
+		t.Fatalf("human unmatched selection = %d, %q, %q", code, out, diagnostic)
 	}
 }
 

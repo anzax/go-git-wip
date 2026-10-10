@@ -15,7 +15,14 @@ func (o *options) repository(cmd *cobra.Command) (*wip.Repository, error) {
 
 func (o *options) saveCommand() *cobra.Command {
 	var capture wip.CaptureOptions
-	cmd := &cobra.Command{Use: "save [PATH...]", Short: "Save tracked and non-ignored untracked files as a checkpoint", Args: argumentCount(0, -1)}
+	cmd := &cobra.Command{
+		Use:   "save [PATH...]",
+		Short: "Save tracked and non-ignored untracked files as a checkpoint",
+		Long: "Save tracked and non-ignored untracked files as a checkpoint.\n" +
+			"No paths selects the whole repository; every literal path must match eligible content.\n" +
+			"Use -m TEXT for a message.",
+		Args: argumentCount(0, -1),
+	}
 	cmd.Flags().BoolVar(&capture.Baseline, "baseline", false, "force a checkpoint even when unchanged")
 	cmd.Flags().BoolVar(&capture.TrackedOnly, "tracked-only", false, "exclude untracked files (staged additions remain included)")
 	cmd.Flags().BoolVar(&capture.IncludeIgnored, "ignored", false, "also include ignored untracked files")

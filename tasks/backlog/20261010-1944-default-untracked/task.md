@@ -59,14 +59,7 @@ macOS and Git 2.30 have not been execution-tested.
 
 ## Resume
 
-Implementation and verification are complete; changes are frozen for the integration
-owner's separate authorized task commit.
-The API replaces `IncludeUntracked` with `TrackedOnly`; CLI replaces `--untracked`
-with `--tracked-only`. Zero-value capture includes non-ignored untracked files;
-`IncludeIgnored`/`--ignored` works independently and conflicts with tracked-only.
-
-HEAD-based independent partial snapshots, parent/ref/no-change behavior, and existing
-explicit-selection validation are unchanged. Selection validation is the next linked
-[task](../20261010-1948-validate-capture-selection/task.md). No work has begun on it.
-The existing trailing README and package-doc demonstration comments were preserved
-exactly and are unrelated to this task.
+Complete. Implemented, reviewed, verified, and committed as `1452b49`.
+The API uses `TrackedOnly`; CLI uses `--tracked-only`. Zero-value capture includes
+non-ignored untracked files. Ignored inclusion is independent and conflicts with
+tracked-only capture. See the next [selection-validation task](../20261010-1948-validate-capture-selection/task.md).

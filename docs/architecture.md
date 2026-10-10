@@ -66,9 +66,14 @@ removed. Non-ignored untracked files are included by default; `TrackedOnly` excl
 them. Ignored untracked files require `IncludeIgnored`, which conflicts with
 `TrackedOnly`. These rules also apply to forced baselines. Explicit path selection
 never bypasses these policies.
-An empty path list selects the whole repository. Selected directories match their
-contents, including deleted tracked descendants. Outside-root paths and paths through
-symlink directories are rejected; a tracked symlink itself is a normal Git entry.
+An empty path list selects the whole repository, even if eligibility is empty.
+Validate each explicit selection against the complete eligible set before filtering
+or allocating the private index. An unmatched selection returns `KindInvalidOption`
+and identifies the normalized repository-relative selection; mixed valid/unmatched
+selections also fail. Selected directories match their contents, including deleted
+tracked descendants. Unchanged eligible files remain valid: no-change still compares
+the complete HEAD-based proposed snapshot with the chosen parent. Outside-root paths
+and paths through symlink directories are rejected; a tracked symlink itself is a normal Git entry.
 Sparse working trees, unmerged indexes, and gitlinks/submodules are unsupported for
 capture until their semantics receive dedicated tests.
 
@@ -77,10 +82,10 @@ capture until their semantics receive dedicated tests.
 2. The parent is the existing owned tip if its recorded base equals HEAD; otherwise
    the parent is HEAD. A changed HEAD starts a new stack at publication, retaining
    the old tip only through the reflog under normal Git retention rules.
-3. Create a private temporary index and read HEAD's tree into it. Enumerate eligible
-   paths with NUL-delimited Git plumbing, intersect literal selection, and apply the
-   working content/deletions only for those paths. Never write or refresh the real
-   index. Do not construct shell commands.
+3. Enumerate eligible paths with NUL-delimited Git plumbing, validate every explicit
+   selection, then intersect literal selection. Create a private temporary index,
+   read HEAD's tree into it, and apply working content/deletions only for those paths.
+   Never write or refresh the real index. Do not construct shell commands.
 4. Write the resulting tree. Compare it against the chosen parent's tree. Equal
    trees return `Created=false`, empty `Commit`, and the observed parent/ref/HEAD,
    without changing the ref. `Baseline=true` forces a commit even when equal.
