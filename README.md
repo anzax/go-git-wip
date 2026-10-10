@@ -47,9 +47,12 @@ make install
 go-git-wip --help
 ```
 
-Installation uses `go install ./cmd/go-git-wip` and honors `GOBIN`. When `GOBIN`
-is unset, Go installs into the first `GOPATH` entry's `bin` directory (normally
-`$HOME/go/bin`). Add the installation directory to your `PATH`.
+Installation rebuilds the CLI and installs it into `$HOME/.local/bin` by default.
+Add that directory to your `PATH` if needed. To choose another destination:
+
+```sh
+make install BINDIR=/custom/path
+```
 
 ## Capture and history policies
 

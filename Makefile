@@ -1,10 +1,14 @@
 .PHONY: build install test check example race fmt
 
+BINDIR ?= $(HOME)/.local/bin
+
 build:
 	go build -o bin/go-git-wip ./cmd/go-git-wip
 
-install:
-	go install ./cmd/go-git-wip
+install: build
+	mkdir -p "$(BINDIR)"
+	install -m 0755 bin/go-git-wip "$(BINDIR)/go-git-wip"
+	@printf 'Installed %s\n' "$(BINDIR)/go-git-wip"
 
 test:
 	go test ./...
