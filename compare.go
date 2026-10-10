@@ -13,14 +13,8 @@ func (r *Repository) Inspect(ctx context.Context, revision string, options Compa
 	if err != nil {
 		return Comparison{}, err
 	}
-	if cp.Parent != cp.Base {
-		parent, err := r.resolveCheckpoint(ctx, cp.Parent)
-		if err != nil {
-			return Comparison{}, err
-		}
-		if parent.Branch != cp.Branch || parent.Base != cp.Base {
-			return Comparison{}, &Error{Kind: KindInvalidRef, Op: "inspect", Message: "checkpoint parent belongs to another stack"}
-		}
+	if _, err := r.validateCheckpointParent(ctx, cp, "inspect"); err != nil {
+		return Comparison{}, err
 	}
 	paths, err := r.normalizePaths(options.Paths)
 	if err != nil {

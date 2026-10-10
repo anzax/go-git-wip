@@ -138,6 +138,20 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	return cp, nil
 }
 
+func (r *Repository) validateCheckpointParent(ctx context.Context, cp Checkpoint, op string) (Checkpoint, error) {
+	if cp.Parent == cp.Base {
+		return Checkpoint{}, nil
+	}
+	parent, err := r.resolveCheckpoint(ctx, cp.Parent)
+	if err != nil {
+		return Checkpoint{}, err
+	}
+	if parent.Branch != cp.Branch || parent.Base != cp.Base {
+		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: op, Message: "checkpoint parent belongs to another stack"}
+	}
+	return parent, nil
+}
+
 func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string) (Checkpoint, error) {
 	branch, err := r.validateCheckpointRef(ctx, ref)
 	if err != nil {
@@ -187,14 +201,8 @@ func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string
 	if cp.Branch != branch {
 		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "checkpoint metadata does not match its branch"}
 	}
-	if cp.Parent != cp.Base {
-		parent, err := r.resolveCheckpoint(ctx, cp.Parent)
-		if err != nil {
-			return Checkpoint{}, err
-		}
-		if parent.Branch != cp.Branch || parent.Base != cp.Base {
-			return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "checkpoint parent belongs to another stack"}
-		}
+	if _, err := r.validateCheckpointParent(ctx, cp, "ref"); err != nil {
+		return Checkpoint{}, err
 	}
 	return cp, nil
 }

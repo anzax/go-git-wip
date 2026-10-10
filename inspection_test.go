@@ -295,3 +295,62 @@ func TestInspectionDetachedUnbornAndInvalidRefs(t *testing.T) {
 	_, err = r.Refs(ctx)
 	requireInspectionKind(t, err, KindInvalidRef)
 }
+
+func TestInspectionCheckpointParentStackValidation(t *testing.T) {
+	for _, mismatch := range []string{"branch", "base"} {
+		t.Run(mismatch, func(t *testing.T) {
+			ctx := context.Background()
+			f := newTestRepository(t, true)
+			r := openInspectionRepository(t, f, "")
+			head, tree := f.git("rev-parse", "HEAD"), f.git("rev-parse", "HEAD^{tree}")
+			checkpoint := func(parent, branch, base, message string) string {
+				body := "go-git-wip:1 {\"branch\":\"" + branch + "\",\"base\":\"" + base + "\"}\n\n" + message
+				return f.git("commit-tree", tree, "-p", parent, "-m", body)
+			}
+			parentBranch, parentBase := "main", head
+			if mismatch == "branch" {
+				parentBranch = "other"
+			} else {
+				parentBase = f.git("commit-tree", tree, "-p", head, "-m", "other base")
+			}
+			parent := checkpoint(parentBase, parentBranch, parentBase, "parent")
+			child := checkpoint(parent, "main", head, "child")
+			f.git("update-ref", "refs/wip/main", child)
+			requireMismatch := func(err error, op string) {
+				t.Helper()
+				var detail *Error
+				if !errors.As(err, &detail) || detail.Kind != KindInvalidRef || detail.Op != op || detail.Message != "checkpoint parent belongs to another stack" {
+					t.Fatalf("error = %v; want invalid_ref from %s for a mismatched parent", err, op)
+				}
+			}
+			_, err := r.Status(ctx)
+			requireMismatch(err, "ref")
+			_, err = r.Inspect(ctx, child, CompareOptions{})
+			requireMismatch(err, "inspect")
+			for _, limit := range []int{0, 1} {
+				_, err = r.History(ctx, HistoryOptions{Revision: child, Limit: limit})
+				requireMismatch(err, "history")
+			}
+
+			// A valid direct parent permits bounded reads even if its own parent is invalid.
+			grandchild := checkpoint(child, "main", head, "grandchild")
+			f.git("update-ref", "refs/wip/main", grandchild)
+			status, err := r.Status(ctx)
+			if err != nil || status.Tip != grandchild || !status.Active {
+				t.Fatalf("bounded status = %+v, %v", status, err)
+			}
+			comparison, err := r.Inspect(ctx, grandchild, CompareOptions{})
+			if err != nil || comparison.From != child || comparison.To != grandchild {
+				t.Fatalf("bounded inspection = %+v, %v", comparison, err)
+			}
+			history, err := r.History(ctx, HistoryOptions{Revision: grandchild, Limit: 1})
+			if err != nil || len(history) != 1 || history[0].Commit != grandchild {
+				t.Fatalf("bounded history = %+v, %v", history, err)
+			}
+			for _, limit := range []int{0, 2} {
+				_, err = r.History(ctx, HistoryOptions{Revision: grandchild, Limit: limit})
+				requireMismatch(err, "history")
+			}
+		})
+	}
+}

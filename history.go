@@ -59,18 +59,9 @@ func (r *Repository) History(ctx context.Context, options HistoryOptions) ([]Che
 	result := []Checkpoint{}
 	current := tip
 	for {
-		if current.Branch != tip.Branch || current.Base != tip.Base {
-			return nil, &Error{Kind: KindInvalidRef, Op: "history", Message: "checkpoint parent belongs to another stack"}
-		}
-		var parent Checkpoint
-		if current.Parent != current.Base {
-			parent, err = r.resolveCheckpoint(ctx, current.Parent)
-			if err != nil {
-				return nil, err
-			}
-			if parent.Branch != tip.Branch || parent.Base != tip.Base {
-				return nil, &Error{Kind: KindInvalidRef, Op: "history", Message: "checkpoint parent belongs to another stack"}
-			}
+		parent, err := r.validateCheckpointParent(ctx, current, "history")
+		if err != nil {
+			return nil, err
 		}
 		matches := true
 		if len(paths) != 0 {
