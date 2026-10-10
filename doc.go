@@ -1,6 +1,16 @@
-// Package wip will provide working-tree checkpoints stored as native Git commits.
+// Package wip provides working-tree checkpoints stored as native Git commits.
 //
-// This bootstrap reserves the public package. Checkpoint operations are not yet
-// implemented. The library will invoke the local git executable and will not
-// depend on the CLI, process-wide working directory changes, or terminal I/O.
+// Open targets an explicit repository directory. Capture uses a private index
+// and conditional refs/wip/<branch> updates, preserving HEAD, normal branch refs,
+// the real index, and working files. History, Compare, and ReadFile expose review
+// data; Delete and Cleanup manage owned refs with observed-tip checks.
+//
+// All operations accept context and return structured results and errors. The
+// library invokes local Git without prompts, terminal output, process-wide
+// directory changes, or a dependency on the CLI. Git 2.30 or newer and Linux or
+// macOS are required. Capture needs an attached local branch with an existing
+// commit and does not support sparse worktrees, unmerged indexes, or gitlinks.
+//
+// Checkpoints are local and ephemeral: normal Git reflog expiry and garbage
+// collection apply. They are not a backup system.
 package wip

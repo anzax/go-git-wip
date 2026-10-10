@@ -1,6 +1,8 @@
 # Working on go-git-wip
 
-Read README.md, the current task, and docs/requirements.md before implementation. Follow tasks/README.md for progress and handoff.
+Read README.md, the current task, and docs/requirements.md before implementation.
+Settled API/storage policies live in docs/architecture.md; CLI contracts live in
+docs/cli.md. Follow tasks/README.md for progress and handoff.
 
 ## Implementation
 

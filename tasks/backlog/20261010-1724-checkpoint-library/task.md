@@ -1,6 +1,6 @@
 ---
 title: Implement independent Git checkpoint library and CLI
-status: active
+status: done
 updated: '2026-10-10'
 ---
 
@@ -20,12 +20,12 @@ runnable embedding example. Follow [requirements](../../../docs/requirements.md)
 - [x] Implement structured status/history, checkpoint inspection, file changes,
   explicit revision-pair comparison, historical file reads, ref listing/deletion,
   and orphan cleanup.
-- [ ] Design and wire a small CLI with explicit write commands, human/JSON output,
+- [x] Design and wire a small CLI with explicit write commands, human/JSON output,
   predictable noninteractive behavior, and help on no arguments.
-- [ ] Write original scenario tests and verify objects/refs with Git commands.
-- [ ] Add a runnable external Go consumer for baseline/capture/history/range selection.
-- [ ] Review correctness, readability, modularity, and complexity; resolve findings.
-- [ ] Update API/CLI docs and record successful `make check` and `make build` runs.
+- [x] Write original scenario tests and verify objects/refs with Git commands.
+- [x] Add a runnable external Go consumer for baseline/capture/history/range selection.
+- [x] Review correctness, readability, modularity, and complexity; resolve findings.
+- [x] Update API/CLI docs and record successful `make check` and `make build` runs.
 
 ## Execution slices
 
@@ -52,11 +52,25 @@ Support Linux and macOS only; validate on the Linux host.
 
 ## Verification
 
-Astra settled design/contracts and reviewed the foundation; make check/build passed. Use disposable repositories, isolated Git configuration/identity, and
-original tests from the behavior contract. Compare tree contents, ancestry, refs,
-reflogs, and state preservation with Git itself. No C++ toolchain is required.
+Completed in isolated commits: foundation `2003864`, capture `492e95f`, inspection
+`b7414d2`, then CLI/embedding/documentation. Astra medium settled software design and
+contracts and independently reviewed each implementation phase. Sol 6.1 high handled
+mechanical implementation and validation with at most two active, disjoint agents.
+
+Original temporary-repository tests use Git as the oracle for trees, ancestry, refs,
+reflogs and exact index/worktree preservation. Coverage includes staged/untracked/
+ignored files, partial captures, normal-HEAD rollover, ownership, conflicts, cancellation,
+review data, binary reads, explicit deletion and partial orphan cleanup. CLI tests
+exercise the built process, JSON/human output, exit categories and actual SIGINT.
+The separate external Go module demonstrates the public API end to end.
+
+Final `make check`, `make build`, `make race`, `git diff --check`, and local Markdown
+link checks passed on Linux/arm64 with Go 1.27.2 and Git 2.56.0. Only Linux execution
+is validated. macOS and the declared Git 2.30 minimum were not execution-tested.
+All review findings resolved; core docs/instructions updated with settled contracts.
 
 ## Resume
 
-Library operations complete and reviewed. Deliver CLI, external embedding workflow,
-final documentation and end-to-end Linux validation.
+Scope complete. Read maintained requirements, architecture, library guide and CLI
+guide for future changes. Capture intentionally excludes sparse/unmerged/submodule
+states; no restore engine, background service or workflow orchestration was added.
