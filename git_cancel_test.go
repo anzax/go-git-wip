@@ -235,3 +235,64 @@ exit 0
 		t.Fatal("expected the pipe-holding descendant to remain until cleanup")
 	}
 }
+
+func TestOutputLimitStopsFilterDescendantsAndCleansPrivateIndex(t *testing.T) {
+	f := newTestRepository(t, true)
+	r, err := OpenWithOptions(context.Background(), f.dir, OpenOptions{MaxStdoutBytes: 4096, MaxStderrBytes: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := captureFixture(t, r, CaptureOptions{Baseline: true})
+	f.write("tracked.txt", "staged\n")
+	f.git("add", "--", "tracked.txt")
+	f.write("tracked.txt", "working\n")
+	dir := t.TempDir()
+	parentFile, childFile := filepath.Join(dir, "parent"), filepath.Join(dir, "child")
+	program := filepath.Join(dir, "clean")
+	script := `#!/bin/sh
+printf '%s\n' "$$" > "$1"
+/bin/sh -c 'printf "%s\n" "$$" > "$1"; exec sleep 30' child "$2" &
+while test ! -s "$2"; do sleep 0.01; done
+while :; do printf 'filter stderr exceeds its selected collection limit\n' >&2; done
+`
+	if err := os.WriteFile(program, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
+	f.git("config", "filter.wip-output.clean", quote(program)+" "+quote(parentFile)+" "+quote(childFile))
+	f.git("config", "filter.wip-output.required", "true")
+	f.write(".gitattributes", "tracked.txt filter=wip-output\n")
+	t.Cleanup(func() {
+		for _, path := range []string{childFile, parentFile} {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			if err == nil && pid > 0 {
+				process, err := os.FindProcess(pid)
+				if err == nil {
+					_ = process.Kill()
+				}
+			}
+		}
+	})
+	defer preserveReadFixture(t, f)()
+	attributes := f.read(".gitattributes")
+	temporary := t.TempDir()
+	t.Setenv("TMPDIR", temporary)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, err = r.Capture(ctx, CaptureOptions{})
+	requireErrorKind(t, err, KindOutputLimit)
+	if processRunning(t, filterPID(t, parentFile)) || processRunning(t, filterPID(t, childFile)) {
+		t.Fatal("output overflow left a filter or its ordinary descendant executing")
+	}
+	entries, err := os.ReadDir(temporary)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("output overflow left private-index files: %v, %v", entries, err)
+	}
+	if !bytes.Equal(attributes, f.read(".gitattributes")) || f.git("rev-parse", baseline.Ref) != baseline.Commit {
+		t.Fatal("output overflow changed attributes or checkpoint ref")
+	}
+}

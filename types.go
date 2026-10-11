@@ -14,6 +14,7 @@ const (
 	KindNotFound      ErrorKind = "not_found"
 	KindConflict      ErrorKind = "conflict"
 	KindGit           ErrorKind = "git"
+	KindOutputLimit   ErrorKind = "output_limit"
 )
 
 // Error describes an operation failure. Err retains cancellation and process errors.
@@ -26,13 +27,21 @@ type Error struct {
 	Err     error
 }
 
-// OpenOptions selects the Git environment policy for a repository. Zero options
-// preserve Open's default behavior.
+// OpenOptions selects immutable Git environment and output collection policies.
+// Zero options preserve Open's default behavior.
 type OpenOptions struct {
 	// IgnoreInheritedGitEnvironment strips all inherited GIT_* variables from each
 	// Git command, preserving other environment and library-controlled overrides.
 	// It does not disable Git configuration read from ordinary configuration files.
 	IgnoreInheritedGitEnvironment bool
+
+	// MaxStdoutBytes and MaxStderrBytes bound bytes collected from each Git
+	// subprocess, including repository discovery. Zero is unlimited; negative
+	// limits are invalid. Exceeding either limit stops the subprocess and returns
+	// KindOutputLimit without successful truncated data. These are per-command
+	// limits, not aggregate operation or Git process memory limits.
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
 }
 
 // RepositoryInfo describes the explicitly opened working tree. Branch is the short

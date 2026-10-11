@@ -252,7 +252,7 @@ func (r *Repository) publishCapture(ctx context.Context, info RepositoryInfo, re
 	input := []byte(fmt.Sprintf("start\nverify refs/heads/%s %s\nupdate %s %s %s\nprepare\ncommit\n", info.Branch, info.HEAD, ref, commit, previous))
 	_, err := r.gitEnv(ctx, identity, input, "update-ref", "--no-deref", "--create-reflog", "-m", "go-git-wip checkpoint", "--stdin")
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return err
 		}
 		current, readErr := r.Info(ctx)
@@ -261,7 +261,7 @@ func (r *Repository) publishCapture(ctx context.Context, info RepositoryInfo, re
 		}
 		tip, readErr := r.validateTip(ctx, ref, info.Branch)
 		if readErr != nil {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || outputLimitError(readErr) {
 				return readErr
 			}
 			return &Error{Kind: KindConflict, Op: "capture", Message: "checkpoint ref changed during publication", Err: err}

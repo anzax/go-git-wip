@@ -16,7 +16,7 @@ func (r *Repository) validateCheckpointRef(ctx context.Context, ref string) (str
 		return "", &Error{Kind: KindInvalidRef, Op: "ref", Message: "expected a complete refs/wip/ ref"}
 	}
 	if _, err := r.git(ctx, "check-ref-format", ref); err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return "", err
 		}
 		return "", &Error{Kind: KindInvalidRef, Op: "ref", Message: "invalid checkpoint ref name", Err: err}
@@ -94,7 +94,7 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	}
 	base, err := r.resolveCommit(ctx, meta.Base)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return Checkpoint{}, err
 		}
 		return invalid("checkpoint base commit is unavailable")
@@ -127,7 +127,7 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	}
 	parent, err := r.resolveCommit(ctx, cp.Parent)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return Checkpoint{}, err
 		}
 		return invalid("checkpoint parent commit is unavailable")
@@ -163,7 +163,7 @@ func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string
 	if _, err := r.git(ctx, "symbolic-ref", "--quiet", ref); err == nil {
 		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "symbolic checkpoint refs are unsupported"}
 	} else if !gitExitCode(err, 1) {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return Checkpoint{}, err
 		}
 		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "checkpoint ref cannot be resolved", Err: err}
@@ -172,7 +172,7 @@ func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string
 	// otherwise reports indistinguishably from absence. Match the full name exactly.
 	refs, err := r.git(ctx, "show-ref")
 	if err != nil && !gitExitCode(err, 1) {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return Checkpoint{}, err
 		}
 		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "repository contains an invalid ref", Err: err}
@@ -190,7 +190,7 @@ func (r *Repository) validateTip(ctx context.Context, ref, expectedBranch string
 	}
 	cp, err := r.resolveCheckpoint(ctx, tip)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return Checkpoint{}, err
 		}
 		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "ref", Message: "invalid checkpoint ref target", Err: err}

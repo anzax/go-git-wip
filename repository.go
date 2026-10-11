@@ -16,6 +16,8 @@ type Repository struct {
 	gitDir                        string
 	gitPath                       string
 	ignoreInheritedGitEnvironment bool
+	maxStdoutBytes                int64
+	maxStderrBytes                int64
 }
 
 // Open discovers a non-bare working tree from an explicit directory, including a
@@ -24,9 +26,12 @@ func Open(ctx context.Context, directory string) (*Repository, error) {
 	return OpenWithOptions(ctx, directory, OpenOptions{})
 }
 
-// OpenWithOptions discovers a working tree with an explicit Git environment policy.
-// The selected policy applies during discovery and all subsequent operations.
+// OpenWithOptions discovers a working tree with explicit environment and output
+// collection policies, applied during discovery and all subsequent operations.
 func OpenWithOptions(ctx context.Context, directory string, options OpenOptions) (*Repository, error) {
+	if options.MaxStdoutBytes < 0 || options.MaxStderrBytes < 0 {
+		return nil, &Error{Kind: KindInvalidOption, Op: "open", Message: "output byte limits must not be negative"}
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, &Error{Kind: KindGit, Op: "open", Message: "operation cancelled", Err: err}
 	}
@@ -53,7 +58,8 @@ func OpenWithOptions(ctx context.Context, directory string, options OpenOptions)
 	if err != nil {
 		return nil, &Error{Kind: KindGitNotFound, Op: "open", Message: "resolve Git executable", Err: err}
 	}
-	r := &Repository{dir: dir, gitPath: gitPath, ignoreInheritedGitEnvironment: options.IgnoreInheritedGitEnvironment}
+	r := &Repository{dir: dir, gitPath: gitPath, ignoreInheritedGitEnvironment: options.IgnoreInheritedGitEnvironment,
+		maxStdoutBytes: options.MaxStdoutBytes, maxStderrBytes: options.MaxStderrBytes}
 	bare, err := r.git(ctx, "rev-parse", "--is-bare-repository")
 	if err != nil {
 		if gitExitCode(err, 128) {

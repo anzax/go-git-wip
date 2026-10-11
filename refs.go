@@ -12,7 +12,7 @@ import (
 func (r *Repository) Refs(ctx context.Context) ([]RefInfo, error) {
 	out, err := r.git(ctx, "show-ref")
 	if err != nil && !gitExitCode(err, 1) {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return nil, err
 		}
 		return nil, &Error{Kind: KindInvalidRef, Op: "refs", Message: "repository contains an invalid ref", Err: err}
@@ -82,7 +82,7 @@ func (r *Repository) Delete(ctx context.Context, options DeleteOptions) (DeleteR
 	}
 	_, err = r.git(ctx, "update-ref", "--no-deref", "-d", options.Ref, options.ExpectedTip)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
 			return result, err
 		}
 		current, readErr := r.validateTip(ctx, options.Ref, branch)
@@ -121,7 +121,7 @@ func (r *Repository) Cleanup(ctx context.Context, targets []DeleteOptions) (Clea
 		if err != nil {
 			result.Failures = append(result.Failures, CleanupFailure{Ref: target.Ref, Message: err.Error(), Err: err})
 			var failure *Error
-			if ctx.Err() != nil || (errors.As(err, &failure) && failure.Kind == KindGit) {
+			if ctx.Err() != nil || (errors.As(err, &failure) && (failure.Kind == KindGit || failure.Kind == KindOutputLimit)) {
 				return result, err
 			}
 		}

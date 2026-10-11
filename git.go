@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,7 +30,9 @@ func (r *Repository) gitEnv(ctx context.Context, overrides []string, input []byt
 		"-c", "tag.gpgSign=false",
 	}
 	gitArgs = append(gitArgs, args...)
-	cmd := exec.CommandContext(ctx, r.gitPath, gitArgs...)
+	commandCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cmd := exec.CommandContext(commandCtx, r.gitPath, gitArgs...)
 	configureGitProcess(cmd)
 	cmd.Dir = dir
 	inherited := os.Environ()
@@ -47,19 +50,73 @@ func (r *Repository) gitEnv(ctx context.Context, overrides []string, input []byt
 	cmd.Stdin = bytes.NewReader(input)
 	// Detached descendants or leftovers after Git exits can hold output pipes.
 	cmd.WaitDelay = 100 * time.Millisecond
-	var stdout, stderr bytes.Buffer
+	stdout := outputCollector{limit: r.maxStdoutBytes, stream: "stdout", cancel: cancel}
+	stderr := outputCollector{limit: r.maxStderrBytes, stream: "stderr", cancel: cancel}
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	op := "git"
+	if len(args) > 0 {
+		op = args[0]
+	}
+	if ctx.Err() == nil {
+		for _, output := range []*outputCollector{&stdout, &stderr} {
+			if output.err != nil {
+				return nil, &Error{Kind: KindOutputLimit, Op: op, Message: output.err.Error(), Stderr: strings.TrimSpace(string(stderr.data)), Err: output.err}
+			}
+		}
+	}
+	if err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()
 		}
-		op := "git"
-		if len(args) > 0 {
-			op = args[0]
-		}
-		return nil, &Error{Kind: KindGit, Op: op, Message: "Git command failed", Stderr: strings.TrimSpace(stderr.String()), Err: err}
+		return nil, &Error{Kind: KindGit, Op: op, Message: "Git command failed", Stderr: strings.TrimSpace(string(stderr.data)), Err: err}
 	}
-	return stdout.Bytes(), nil
+	return stdout.data, nil
+}
+
+// Each output pipe has one copying goroutine. Cancellation is concurrency-safe;
+// fields are inspected only after Run joins those copying goroutines. Capacity
+// grows within the limit so the retained backing array is bounded as well.
+type outputCollector struct {
+	data   []byte
+	limit  int64
+	stream string
+	cancel context.CancelFunc
+	err    error
+}
+
+func (b *outputCollector) Write(p []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
+	n := len(p)
+	if b.limit > 0 && int64(n) > b.limit-int64(len(b.data)) {
+		n = int(b.limit - int64(len(b.data)))
+		b.err = fmt.Errorf("Git %s exceeds %d-byte output limit", b.stream, b.limit)
+	}
+	needed := len(b.data) + n
+	if needed > cap(b.data) {
+		capacity := needed
+		if cap(b.data) <= int(^uint(0)>>1)/2 && cap(b.data)*2 > capacity {
+			capacity = cap(b.data) * 2
+		}
+		if b.limit > 0 && int64(capacity) > b.limit {
+			capacity = int(b.limit)
+		}
+		grown := make([]byte, len(b.data), capacity)
+		copy(grown, b.data)
+		b.data = grown
+	}
+	b.data = append(b.data, p[:n]...)
+	if b.err != nil {
+		b.cancel()
+	}
+	return n, b.err
+}
+
+func outputLimitError(err error) bool {
+	var detail *Error
+	return errors.As(err, &detail) && detail.Kind == KindOutputLimit
 }
 
 func gitEnvironment(inherited, overrides []string) []string {
