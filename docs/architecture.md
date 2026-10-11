@@ -14,19 +14,21 @@ or unborn working trees; bare repositories are unsupported. Capture requires an
 attached local branch with a commit. Repository state is read anew for each operation.
 All operations accept a context, and all returned object IDs are full IDs.
 
-| Method | Result and purpose |
-| --- | --- |
-| `Info(ctx)` | `RepositoryInfo`: invocation directory, root, Git directory, branch, HEAD |
-| `Capture(ctx, CaptureOptions)` | `CaptureResult`: publication or successful no-change |
-| `Status(ctx)` | `Status`: current branch, checkpoint tip/base, active-history flag |
-| `History(ctx, HistoryOptions)` | `[]Checkpoint`: newest first along one owned stack |
-| `Refs(ctx)` | `[]RefInfo`: lexicographically sorted owned refs, including orphans |
-| `Reflog(ctx, ref, limit)` | `[]ReflogEntry`: retained records, newest first |
-| `Inspect(ctx, revision, CompareOptions)` | `Comparison`: owned checkpoint versus its parent |
-| `Compare(ctx, from, to, CompareOptions)` | `Comparison`: arbitrary explicit commit revisions |
-| `ReadFile(ctx, revision, path)` | `[]byte`: exact blob contents, including binary files |
-| `Delete(ctx, DeleteOptions)` | `DeleteResult`: conditional deletion of one owned ref |
-| `Cleanup(ctx, []DeleteOptions)` | `CleanupResult`: explicit orphan targets and partial failures |
+`OpenWithOptions(ctx, directory, OpenOptions)` adds an opt-in environment policy; `Open` delegates with zero options. `IgnoreInheritedGitEnvironment: true` copies an immutable policy into the repository and strips every inherited `GIT_*` variable during discovery and every subsequent Git command. Concurrent operations reuse that policy while reading the current environment independently. Non-Git environment variables are preserved, and library-controlled safety, identity, and index overrides are supplied after filtering. Ordinary Git configuration files remain active; this option isolates inherited Git environment, not repository configuration or clean filters.
+
+| Method                                   | Result and purpose                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `Info(ctx)`                              | `RepositoryInfo`: invocation directory, root, Git directory, branch, HEAD |
+| `Capture(ctx, CaptureOptions)`           | `CaptureResult`: publication or successful no-change                      |
+| `Status(ctx)`                            | `Status`: current branch, checkpoint tip/base, active-history flag        |
+| `History(ctx, HistoryOptions)`           | `[]Checkpoint`: newest first along one owned stack                        |
+| `Refs(ctx)`                              | `[]RefInfo`: lexicographically sorted owned refs, including orphans       |
+| `Reflog(ctx, ref, limit)`                | `[]ReflogEntry`: retained records, newest first                           |
+| `Inspect(ctx, revision, CompareOptions)` | `Comparison`: owned checkpoint versus its parent                          |
+| `Compare(ctx, from, to, CompareOptions)` | `Comparison`: arbitrary explicit commit revisions                         |
+| `ReadFile(ctx, revision, path)`          | `[]byte`: exact blob contents, including binary files                     |
+| `Delete(ctx, DeleteOptions)`             | `DeleteResult`: conditional deletion of one owned ref                     |
+| `Cleanup(ctx, []DeleteOptions)`          | `CleanupResult`: explicit orphan targets and partial failures             |
 
 Each method also returns `error`. `Error.Kind` is the stable classification;
 `errors.As` exposes its details and `errors.Is` retains context cancellation through
@@ -176,6 +178,7 @@ Use `exec.CommandContext`, argument arrays and explicit command directories.
 Preserve normal Git configuration while stripping inherited variables capable of
 redirecting the repository, index, namespace, object storage, or injected command
 configuration. Supply operation-specific index and identity overrides explicitly.
+With `IgnoreInheritedGitEnvironment`, strip all inherited `GIT_*` variables before applying those library-controlled overrides; default opens retain the existing selective filtering policy.
 Disable optional index writes, fsmonitor, signing, hooks, external diff, textconv,
 and interactive prompting where applicable. Capture stderr privately. NUL-delimited
 output protects filenames containing spaces, tabs, and newlines. Do not assume SHA-1

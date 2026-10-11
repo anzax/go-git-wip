@@ -26,6 +26,15 @@ type Error struct {
 	Err     error
 }
 
+// OpenOptions selects the Git environment policy for a repository. Zero options
+// preserve Open's default behavior.
+type OpenOptions struct {
+	// IgnoreInheritedGitEnvironment strips all inherited GIT_* variables from each
+	// Git command, preserving other environment and library-controlled overrides.
+	// It does not disable Git configuration read from ordinary configuration files.
+	IgnoreInheritedGitEnvironment bool
+}
+
 // RepositoryInfo describes the explicitly opened working tree. Branch is the short
 // local branch name, empty when detached; HEAD is empty for an unborn branch.
 type RepositoryInfo struct {

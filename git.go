@@ -31,7 +31,18 @@ func (r *Repository) gitEnv(ctx context.Context, overrides []string, input []byt
 	gitArgs = append(gitArgs, args...)
 	cmd := exec.CommandContext(ctx, r.gitPath, gitArgs...)
 	cmd.Dir = dir
-	cmd.Env = gitEnvironment(os.Environ(), overrides)
+	inherited := os.Environ()
+	if r.ignoreInheritedGitEnvironment {
+		filtered := make([]string, 0, len(inherited))
+		for _, value := range inherited {
+			name, _, _ := strings.Cut(value, "=")
+			if !strings.HasPrefix(name, "GIT_") {
+				filtered = append(filtered, value)
+			}
+		}
+		inherited = filtered
+	}
+	cmd.Env = gitEnvironment(inherited, overrides)
 	cmd.Stdin = bytes.NewReader(input)
 	// A cancelled Git child may have spawned processes holding its output pipes.
 	cmd.WaitDelay = 100 * time.Millisecond

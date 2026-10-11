@@ -7,6 +7,8 @@ Import `github.com/anzax/go-git-wip` as `wip`. The package uses standard-library
 dependencies and local Git 2.30+ on Linux or macOS. Open a repository from an explicit
 directory, including a subdirectory; calls never change the process working directory.
 
+`Open(ctx, directory)` preserves ordinary inherited Git settings while rejecting repository/index redirection and command-configuration injection. Embedding callers that need to ignore every inherited `GIT_*` variable can use `OpenWithOptions(ctx, directory, OpenOptions{IgnoreInheritedGitEnvironment: true})`. Zero options retain `Open` behavior. The chosen policy is copied into the repository and applies to discovery and every later operation, including concurrent calls; each command reads the current process environment without changing it. Other variables, including `HOME` and `PATH`, remain available. Library-controlled index, identity, and safety overrides still apply. Isolation removes inherited tracing destinations and configuration-file overrides, but ordinary system, home, and repository Git configuration files and clean filters remain active.
+
 The [external consumer](../examples/workflow/main.go) is a complete, runnable workflow:
 
 ```sh
@@ -68,15 +70,15 @@ symlink directories are rejected. Every snapshot starts from HEAD: capturing onl
 after capturing A stores HEAD's version of A in the new snapshot. Partial captures
 are independent snapshots rather than cumulative patches.
 
-| Operation | Data returned |
-| --- | --- |
+| Operation        | Data returned                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------- |
 | `Info`, `Status` | Current directory, branch and HEAD; checkpoint tip/base and whether its stack is active |
-| `History` | Checkpoints newest first, ending before the normal base commit |
-| `Refs` | Sorted owned refs, including refs whose normal branch has been deleted |
-| `Reflog` | Retained entries newest first; ordinal selectors distinguish duplicate tips |
-| `Inspect` | An owned checkpoint compared with its parent |
-| `Compare` | Two explicit commit revisions resolved to full object IDs |
-| `ReadFile` | Exact blob bytes; a stored symlink returns its target bytes |
+| `History`        | Checkpoints newest first, ending before the normal base commit                          |
+| `Refs`           | Sorted owned refs, including refs whose normal branch has been deleted                  |
+| `Reflog`         | Retained entries newest first; ordinal selectors distinguish duplicate tips             |
+| `Inspect`        | An owned checkpoint compared with its parent                                            |
+| `Compare`        | Two explicit commit revisions resolved to full object IDs                               |
+| `ReadFile`       | Exact blob bytes; a stored symlink returns its target bytes                             |
 
 `HistoryOptions.Revision` selects an older stack, including one discovered via a
 reflog selector. The default selects the current branch's checkpoint tip even when

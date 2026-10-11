@@ -11,15 +11,22 @@ import (
 // Repository targets one working tree and retains the invocation directory for
 // resolving user-supplied paths. It holds no cached branch or HEAD state.
 type Repository struct {
-	dir     string
-	root    string
-	gitDir  string
-	gitPath string
+	dir                           string
+	root                          string
+	gitDir                        string
+	gitPath                       string
+	ignoreInheritedGitEnvironment bool
 }
 
 // Open discovers a non-bare working tree from an explicit directory, including a
 // subdirectory. Detached and unborn working trees are valid for read operations.
 func Open(ctx context.Context, directory string) (*Repository, error) {
+	return OpenWithOptions(ctx, directory, OpenOptions{})
+}
+
+// OpenWithOptions discovers a working tree with an explicit Git environment policy.
+// The selected policy applies during discovery and all subsequent operations.
+func OpenWithOptions(ctx context.Context, directory string, options OpenOptions) (*Repository, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, &Error{Kind: KindGit, Op: "open", Message: "operation cancelled", Err: err}
 	}
@@ -46,7 +53,7 @@ func Open(ctx context.Context, directory string) (*Repository, error) {
 	if err != nil {
 		return nil, &Error{Kind: KindGitNotFound, Op: "open", Message: "resolve Git executable", Err: err}
 	}
-	r := &Repository{dir: dir, gitPath: gitPath}
+	r := &Repository{dir: dir, gitPath: gitPath, ignoreInheritedGitEnvironment: options.IgnoreInheritedGitEnvironment}
 	bare, err := r.git(ctx, "rev-parse", "--is-bare-repository")
 	if err != nil {
 		if gitExitCode(err, 128) {
