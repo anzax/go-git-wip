@@ -28,6 +28,7 @@ needed. Applications own task tracking, agent hooks, and review orchestration.
   do not silently replace invalid or unrelated history.
 - All potentially long-running operations accept context. Return typed results and
   errors so callers need not parse terminal output or Git's human error wording.
+- On Linux/macOS, context cancellation and deadlines while Git remains active stop its process group, including ordinary filter descendants, while preserving context error identity and bounded output-pipe waits. Do not signal the caller's group or unrelated commands. Descendants that detach into another process group, or survive a leader that exited before cancellation was observed, are outside the termination guarantee.
 - Keep library calls free of prompts, stdout/stderr writes, process exits, and hidden
   configuration changes. Use explicit API options for initial configuration.
 - Preserve the user's Git environment where appropriate while preventing inherited

@@ -130,6 +130,8 @@ and `errors.As(err, &detail)` with `var detail *wip.Error` for structured failur
 `KindInvalidRef`, `KindNotFound`, and `KindUnsupported`. Git stderr is diagnostic
 text, not an API to parse. Do not mutate option slices while a call is using them.
 
+Each Git command runs in its own process group on Linux/macOS. Context cancellation or a deadline while Git remains active sends SIGKILL to that group, stopping Git and ordinary subprocess descendants such as clean filters without signaling the caller's group or other library commands. The runner retains a 100 ms output-pipe wait bound. If Git has already exited before cancellation is observed, surviving descendants may remain running even in its former group; the runner avoids signaling a stale group after its leader has been reaped. Descendants that deliberately detach into another process group are outside the guarantee. Cancellation does not wait for the host to reap killed orphan processes.
+
 Capture uses a fixed noninteractive identity, `WIP checkpoint <wip@localhost>`, with
 the current timestamp. This identity does not distinguish callers or agent sessions;
 keep session identity in caller records and use a readable label in `Message` when

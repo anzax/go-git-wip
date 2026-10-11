@@ -184,6 +184,8 @@ and interactive prompting where applicable. Capture stderr privately. NUL-delimi
 output protects filenames containing spaces, tabs, and newlines. Do not assume SHA-1
 length: derive and validate full object IDs for the repository's object format.
 
+On Linux/macOS, start each Git command with `Setpgid` and a new process group identified by its PID. Override `CommandContext.Cancel` to SIGKILL only that group while its Git leader remains active, including ordinary filter descendants; retain a 100 ms `WaitDelay` for inherited output pipes. Check the command process before signaling and treat an absent group as `os.ErrProcessDone` so an exit racing cancellation follows the standard runner contract. If the leader has already exited before cancellation is observed, descendants can survive the bounded wait: do not signal a stale group after its leader has been reaped. Deliberately detached descendants are also outside the guarantee; no process-tree enumeration or host-wide signaling is performed.
+
 Keep the implementation concrete: one repository type and private execution helpers,
 not a backend interface or command framework. Tests use real temporary repositories
 with isolated Git identity/configuration and assert exact object/tree/index behavior.

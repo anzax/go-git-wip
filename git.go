@@ -30,6 +30,7 @@ func (r *Repository) gitEnv(ctx context.Context, overrides []string, input []byt
 	}
 	gitArgs = append(gitArgs, args...)
 	cmd := exec.CommandContext(ctx, r.gitPath, gitArgs...)
+	configureGitProcess(cmd)
 	cmd.Dir = dir
 	inherited := os.Environ()
 	if r.ignoreInheritedGitEnvironment {
@@ -44,7 +45,7 @@ func (r *Repository) gitEnv(ctx context.Context, overrides []string, input []byt
 	}
 	cmd.Env = gitEnvironment(inherited, overrides)
 	cmd.Stdin = bytes.NewReader(input)
-	// A cancelled Git child may have spawned processes holding its output pipes.
+	// Detached descendants or leftovers after Git exits can hold output pipes.
 	cmd.WaitDelay = 100 * time.Millisecond
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
