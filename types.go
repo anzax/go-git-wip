@@ -110,6 +110,33 @@ type HistoryOptions struct {
 	Paths    []string `json:"paths,omitempty"`
 }
 
+// DiscoveryOptions selects explicit full commit IDs to walk and a positive total
+// candidate budget. Roots are deduplicated; every visited commit counts, including
+// ordinary commits. No path comparisons are performed.
+type DiscoveryOptions struct {
+	Roots          []string `json:"roots"`
+	CandidateLimit int      `json:"candidate_limit"`
+}
+
+// DiscoveryFailure identifies a missing root or invalid checkpoint candidate.
+// Err is available to Go callers; Message supplies its JSON representation.
+type DiscoveryFailure struct {
+	Commit  string `json:"commit"`
+	Message string `json:"message"`
+	Err     error  `json:"-"`
+}
+
+// DiscoveryResult contains locally validated checkpoints in Git traversal order.
+// Callers own display ordering and filtering. Incomplete is true when the budget,
+// a failure, or an operation error prevents a complete listing. Visited counts
+// candidate commits, excluding batched metadata reads for root/dependency checks.
+type DiscoveryResult struct {
+	Checkpoints []Checkpoint       `json:"checkpoints"`
+	Visited     int                `json:"visited"`
+	Incomplete  bool               `json:"incomplete"`
+	Failures    []DiscoveryFailure `json:"failures"`
+}
+
 // RefInfo describes a validated checkpoint ref, including deleted normal branches.
 type RefInfo struct {
 	Ref      string `json:"ref"`

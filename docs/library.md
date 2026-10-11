@@ -46,6 +46,7 @@ Capture includes tracked edits/deletions and non-ignored untracked files by defa
 | --- | --- |
 | `Info`, `Status` | Current directory, branch and HEAD; checkpoint tip/base and whether its stack is active |
 | `History` | Checkpoints newest first, ending before the normal base commit |
+| `Discover` | Validated checkpoints from a bounded candidate walk over explicit full commit roots |
 | `Refs` | Sorted owned refs, including refs whose normal branch has been deleted |
 | `Reflog` | Retained entries newest first; ordinal selectors distinguish duplicate tips |
 | `Inspect` | An owned checkpoint compared with its parent |
@@ -55,6 +56,18 @@ Capture includes tracked edits/deletions and non-ignored untracked files by defa
 `HistoryOptions.Revision` selects an older stack, including one discovered via a reflog selector. The default selects the current branch's checkpoint tip even when stale. Limits of zero mean unlimited; negative limits fail. History path filtering keeps checkpoints whose parent comparison touches a selected path; the limit counts matching checkpoints. Review filtering never changes the earlier capture's scope.
 
 Comparisons expose A/M/D/T statuses, added/deleted line counts, and binary flags. Rename detection is disabled, so a rename appears as deletion plus addition. `IncludePatch` adds separate textual patch output. External diff and text conversion are disabled. File reads preserve binary bytes and never restore working files.
+
+For a fresh bounded listing across several retained tips, call `Discover` with explicit full lowercase commit IDs and a positive total candidate limit:
+
+```go
+listing, err := repository.Discover(ctx, wip.DiscoveryOptions{
+    Roots: retainedTipIDs, CandidateLimit: 500,
+})
+```
+
+Roots are deduplicated and Git traverses their ancestry once. Every visited commit counts, including ordinary commits unrelated to checkpoints, so a sparse history still stops at the budget. `Visited` reports the candidate count; `Incomplete` reports a budget stop or failure. Check `Failures` even when `err` is nil: unavailable/noncommit roots and malformed owned candidates are identified explicitly while valid checkpoints may still be returned. Invalid option IDs return `KindInvalidOption`; command errors, cancellation and output caps return an incomplete result plus an error. Ordinary commits are skipped. The library owns checkpoint format recognition and strict local base/parent validation; no path diffs are performed. The application selects roots, filters checkpoint content, computes fingerprints and orders the display. Re-run for each fresh listing; discovery has no persistent cache or continuation session.
+
+Discovery batches root metadata, candidate bodies and validation dependencies, reusing them within the call. It reads one additional candidate ID to distinguish an exhausted walk, and may read immediate checkpoint parents/base metadata outside the candidate window. Those validation reads are excluded from `Visited` and remain subject to per-command output caps. An incomplete window does not establish that all older ancestry is valid. Candidate limits and byte limits bound different costs; configure both along with a context deadline for an embedding read budget.
 
 ## Ref lifecycle and deletion
 
@@ -76,7 +89,7 @@ Checkpoints are local and ephemeral, not a backup system. Ordinary reflog expiry
 
 All operations accept `context.Context`; repositories can be reused concurrently. Use `errors.Is(err, context.Canceled)` or `context.DeadlineExceeded` for cancellation, and `errors.As(err, &detail)` with `var detail *wip.Error` for structured failures. `detail.Kind` is the stable category, including `KindConflict`, `KindInvalidOption`, `KindInvalidRef`, `KindNotFound`, and `KindUnsupported`. Git stderr is diagnostic text, not an API to parse. Do not mutate option slices while a call is using them.
 
-Set `OpenOptions.MaxStdoutBytes` and `MaxStderrBytes` to independent per-Git-command byte caps (`int64`). They apply during repository opening and every subsequent operation, including captures. Zero means unlimited and preserves existing behavior; negative limits fail. Exceeding a cap while output is being collected stops the command and returns `KindOutputLimit`; a failed read never supplies successful truncated stdout. Collected stderr may be capped diagnostic text. Caller cancellation keeps its context error identity. Caps bound retained stream bytes/backing arrays, not aggregate returned data, parser copies, caller input lists or memory inside Git.
+Set `OpenOptions.MaxStdoutBytes` and `MaxStderrBytes` to independent per-Git-command byte caps (`int64`). They apply during repository opening and every subsequent operation, including captures and batched discovery. Zero means unlimited and preserves existing behavior; negative limits fail. Exceeding a cap while output is being collected stops the command and returns `KindOutputLimit`; a failed read never supplies successful truncated stdout. Collected stderr may be capped diagnostic text. Caller cancellation keeps its context error identity. Caps bound retained stream bytes/backing arrays, not aggregate returned data, parser copies, caller input lists or memory inside Git.
 
 Each Git command runs in its own process group on Linux/macOS. Context cancellation or a deadline while Git remains active sends SIGKILL to that group, stopping Git and ordinary subprocess descendants such as clean filters without signaling the caller's group or other library commands. The runner retains a 100 ms output-pipe wait bound. If Git has already exited before cancellation is observed, surviving descendants may remain running even in its former group; the runner avoids signaling a stale group after its leader has been reaped. Descendants that deliberately detach into another process group are outside the guarantee. Cancellation does not wait for the host to reap killed orphan processes.
 

@@ -39,9 +39,17 @@ func (r *Repository) resolveCommit(ctx context.Context, revision string) (string
 }
 
 func (r *Repository) fullObjectID(ctx context.Context, oid string) (bool, error) {
-	out, err := r.git(ctx, "rev-parse", "--show-object-format")
+	length, err := r.objectIDLength(ctx)
 	if err != nil {
 		return false, err
+	}
+	return validObjectID(oid, length), nil
+}
+
+func (r *Repository) objectIDLength(ctx context.Context) (int, error) {
+	out, err := r.git(ctx, "rev-parse", "--show-object-format")
+	if err != nil {
+		return 0, err
 	}
 	length := 40
 	switch strings.TrimSpace(string(out)) {
@@ -49,13 +57,17 @@ func (r *Repository) fullObjectID(ctx context.Context, oid string) (bool, error)
 	case "sha256":
 		length = 64
 	default:
-		return false, &Error{Kind: KindUnsupported, Op: "object", Message: "unsupported Git object format"}
+		return 0, &Error{Kind: KindUnsupported, Op: "object", Message: "unsupported Git object format"}
 	}
+	return length, nil
+}
+
+func validObjectID(oid string, length int) bool {
 	if len(oid) != length || oid != strings.ToLower(oid) {
-		return false, nil
+		return false
 	}
-	_, err = hex.DecodeString(oid)
-	return err == nil, nil
+	_, err := hex.DecodeString(oid)
+	return err == nil
 }
 
 func (r *Repository) resolveCheckpoint(ctx context.Context, revision string) (Checkpoint, error) {
@@ -71,8 +83,52 @@ func (r *Repository) resolveCheckpoint(ctx context.Context, revision string) (Ch
 }
 
 func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byte) (Checkpoint, error) {
+	cp, err := parseCheckpoint(oid, raw)
+	if err != nil {
+		return Checkpoint{}, err
+	}
+	if _, err := r.validateCheckpointRef(ctx, checkpointRef(cp.Branch)); err != nil {
+		return Checkpoint{}, err
+	}
+	valid, err := r.fullObjectID(ctx, cp.Base)
+	if err != nil {
+		return Checkpoint{}, err
+	}
+	if !valid {
+		return Checkpoint{}, invalidCheckpoint("checkpoint base must be a full commit object ID")
+	}
+	base, err := r.resolveCommit(ctx, cp.Base)
+	if err != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
+			return Checkpoint{}, err
+		}
+		return Checkpoint{}, invalidCheckpoint("checkpoint base commit is unavailable")
+	}
+	if base != cp.Base {
+		return Checkpoint{}, invalidCheckpoint("checkpoint base is not a direct commit ID")
+	}
+	parent, err := r.resolveCommit(ctx, cp.Parent)
+	if err != nil {
+		if ctx.Err() != nil || outputLimitError(err) {
+			return Checkpoint{}, err
+		}
+		return Checkpoint{}, invalidCheckpoint("checkpoint parent commit is unavailable")
+	}
+	if parent != cp.Parent {
+		return Checkpoint{}, invalidCheckpoint("checkpoint parent must be a full direct commit ID")
+	}
+	return cp, nil
+}
+
+func invalidCheckpoint(message string) error {
+	return &Error{Kind: KindInvalidRef, Op: "checkpoint", Message: message}
+}
+
+// parseCheckpoint decodes storage only. Repository object and parent-stack checks
+// are supplied by the ordinary reader or the batched discovery reader.
+func parseCheckpoint(oid string, raw []byte) (Checkpoint, error) {
 	invalid := func(message string) (Checkpoint, error) {
-		return Checkpoint{}, &Error{Kind: KindInvalidRef, Op: "checkpoint", Message: message}
+		return Checkpoint{}, invalidCheckpoint(message)
 	}
 	headers, body, found := bytes.Cut(raw, []byte("\n\n"))
 	if !found {
@@ -81,26 +137,6 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	meta, message, err := decodeCheckpointMessage(string(body))
 	if err != nil {
 		return invalid(err.Error())
-	}
-	if _, err := r.validateCheckpointRef(ctx, checkpointRef(meta.Branch)); err != nil {
-		return Checkpoint{}, err
-	}
-	valid, err := r.fullObjectID(ctx, meta.Base)
-	if err != nil {
-		return Checkpoint{}, err
-	}
-	if !valid {
-		return invalid("checkpoint base must be a full commit object ID")
-	}
-	base, err := r.resolveCommit(ctx, meta.Base)
-	if err != nil {
-		if ctx.Err() != nil || outputLimitError(err) {
-			return Checkpoint{}, err
-		}
-		return invalid("checkpoint base commit is unavailable")
-	}
-	if base != meta.Base {
-		return invalid("checkpoint base is not a direct commit ID")
 	}
 	cp := Checkpoint{Commit: oid, Branch: meta.Branch, Base: meta.Base, Message: message}
 	parents := 0
@@ -124,16 +160,6 @@ func (r *Repository) decodeCheckpoint(ctx context.Context, oid string, raw []byt
 	}
 	if parents != 1 || !committer {
 		return invalid("checkpoint must have one parent and a committer")
-	}
-	parent, err := r.resolveCommit(ctx, cp.Parent)
-	if err != nil {
-		if ctx.Err() != nil || outputLimitError(err) {
-			return Checkpoint{}, err
-		}
-		return invalid("checkpoint parent commit is unavailable")
-	}
-	if parent != cp.Parent {
-		return invalid("checkpoint parent must be a full direct commit ID")
 	}
 	return cp, nil
 }
