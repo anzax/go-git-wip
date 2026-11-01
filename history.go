@@ -83,29 +83,64 @@ func (r *Repository) History(ctx context.Context, options HistoryOptions) ([]Che
 
 // Reflog returns retained records newest first. Duplicate commit IDs remain
 // distinct through their ordinal selectors. Deleting a ref can remove its log.
+// An observed ref change during the read returns KindConflict without entries.
 func (r *Repository) Reflog(ctx context.Context, ref string, limit int) ([]ReflogEntry, error) {
 	if limit < 0 {
 		return nil, &Error{Kind: KindInvalidOption, Op: "reflog", Message: "limit must not be negative"}
 	}
-	branch, err := r.validateCheckpointRef(ctx, ref)
+	if _, err := checkpointRefBranch(ref); err != nil {
+		return nil, err
+	}
+	if _, err := r.git(ctx, "symbolic-ref", "--quiet", ref); err == nil {
+		return nil, &Error{Kind: KindInvalidRef, Op: "ref", Message: "symbolic checkpoint refs are unsupported"}
+	} else if !gitExitCode(err, 1) {
+		if ctx.Err() != nil || outputLimitError(err) {
+			return nil, err
+		}
+		return nil, &Error{Kind: KindInvalidRef, Op: "ref", Message: "checkpoint ref cannot be resolved", Err: err}
+	}
+	refs, err := r.readRefSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tip, err := r.validateTip(ctx, ref, branch)
-	if err != nil {
-		return nil, err
-	}
-	if tip.Commit == "" {
+	if refs[ref] == "" {
 		return []ReflogEntry{}, nil
+	}
+	if _, err := r.validateObservedTips(ctx, refs, []string{ref}); err != nil {
+		return nil, err
 	}
 	args := []string{"reflog", "show", "--format=%H%x00%gs%x00"}
 	if limit != 0 {
 		args = append(args, "--max-count="+strconv.Itoa(limit))
 	}
 	args = append(args, ref, "--")
-	out, err := r.git(ctx, args...)
+	out, readErr := r.git(ctx, args...)
+	if readErr != nil && (ctx.Err() != nil || outputLimitError(readErr)) {
+		return nil, readErr
+	}
+	// Git reads the mutable ref independently of our validation. Fail closed if
+	// its publication changed while the log was read, rather than return a log
+	// rooted in an unvalidated replacement target. A deletion can also make the
+	// log command fail, so ordinary failures need the same ref observation.
+	current, err := r.git(ctx, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(symref)", ref)
 	if err != nil {
+		if readErr != nil && ctx.Err() == nil && !outputLimitError(err) {
+			return nil, readErr
+		}
 		return nil, err
+	}
+	matched := false
+	for _, line := range strings.Split(string(current), "\n") {
+		fields := strings.Split(line, "\x00")
+		if len(fields) == 3 && fields[0] == ref {
+			matched = fields[1] == refs[ref] && fields[2] == ""
+		}
+	}
+	if !matched {
+		return nil, &Error{Kind: KindConflict, Op: "reflog", Message: "checkpoint ref changed while reading its reflog"}
+	}
+	if readErr != nil {
+		return nil, readErr
 	}
 	result := []ReflogEntry{}
 	fields := strings.Split(string(out), "\x00")

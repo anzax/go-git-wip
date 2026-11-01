@@ -73,6 +73,8 @@ Discovery batches root metadata, candidate bodies and validation dependencies, r
 
 Each branch owns `refs/wip/<branch>`, including branch names containing slashes. While HEAD remains unchanged, captures extend one stack. A normal HEAD change makes that stack stale; the next created checkpoint starts from the new HEAD. Earlier tips can be found through retained reflogs while Git retains them. Missing history is an empty result. Detached/unborn working trees support reads but have no active history; capture requires an attached branch and an existing commit.
 
+`Refs` observes all refs once for tip IDs and normal-branch existence, rejects symbolic checkpoint refs, and validates the owned tips and their immediate checkpoint parents with batched object reads and one nontraversing Git header-validation pass. Metadata is reused only within each call; subsequent calls read fresh refs and object availability. Invalid refs fail the listing rather than disappearing. `Reflog` uses the same batched validation for its selected tip, preserves duplicate entries and ordinal selectors, and checks the ref again after reading the log. An observed change or deletion returns `KindConflict` without log entries, including when deletion makes the log command fail. Cancellation and output-limit errors return immediately; other log-command errors retain their original failure when the ref is unchanged or its recheck also fails. These reads are multiple Git commands, not an atomic snapshot; callers that need exclusive read/write coordination supply it.
+
 Deletion requires a full checkpoint ref and its observed full tip ID:
 
 ```go
@@ -97,4 +99,4 @@ Capture uses a fixed noninteractive identity, `WIP checkpoint <wip@localhost>`, 
 
 Conditional updates detect competing checkpoint writers; they do not provide an atomic snapshot while another process writes files or switches branches. A cancelled or killed operation around publication can update a ref without returning success: inspect `Status` or the ref before retrying. Harmless unreachable objects from failed captures remain for normal Git maintenance.
 
-Tests run on Linux/arm64 with Go 1.27.2 and Git 2.56.0. Linux and macOS are supported targets; macOS and the stated minimum Git version have not been execution-tested. See [architecture](architecture.md) for the storage protocol and transaction details, and [CLI usage](cli.md) for the optional adapter's output and confirmation rules.
+The ref/reflog batching checks run on Linux/amd64 with Go 1.27.0 and Git 2.53.0; earlier library checks also ran on Linux/arm64. Linux and macOS are supported targets; macOS and the stated minimum Git version have not been execution-tested. See [architecture](architecture.md) for the storage protocol and transaction details, and [CLI usage](cli.md) for the optional adapter's output and confirmation rules.

@@ -10,39 +10,40 @@ import (
 // Refs lists validated owned refs in lexicographic order, including orphans.
 // An invalid owned entry fails the operation instead of silently disappearing.
 func (r *Repository) Refs(ctx context.Context) ([]RefInfo, error) {
-	out, err := r.git(ctx, "show-ref")
-	if err != nil && !gitExitCode(err, 1) {
-		if ctx.Err() != nil || outputLimitError(err) {
-			return nil, err
-		}
-		return nil, &Error{Kind: KindInvalidRef, Op: "refs", Message: "repository contains an invalid ref", Err: err}
+	refs, err := r.readRefSnapshot(ctx)
+	if err != nil {
+		return nil, err
 	}
 	names := []string{}
-	for _, line := range strings.Split(string(out), "\n") {
-		_, name, found := strings.Cut(line, " ")
-		if found && strings.HasPrefix(name, "refs/wip/") {
+	for name := range refs {
+		if strings.HasPrefix(name, "refs/wip/") {
+			if _, err := checkpointRefBranch(name); err != nil {
+				return nil, err
+			}
 			names = append(names, name)
 		}
 	}
 	sort.Strings(names)
+	if len(names) > 0 {
+		out, err := r.git(ctx, "for-each-ref", "--format=%(refname)%00%(symref)", "refs/wip/")
+		if err != nil {
+			return nil, err
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			name, target, found := strings.Cut(line, "\x00")
+			if found && target != "" && refs[name] != "" {
+				return nil, &Error{Kind: KindInvalidRef, Op: "ref", Message: "symbolic checkpoint refs are unsupported"}
+			}
+		}
+	}
+	tips, err := r.validateObservedTips(ctx, refs, names)
+	if err != nil {
+		return nil, err
+	}
 	result := []RefInfo{}
-	for _, ref := range names {
-		branch, err := r.validateCheckpointRef(ctx, ref)
-		if err != nil {
-			return nil, err
-		}
-		tip, err := r.validateTip(ctx, ref, branch)
-		if err != nil {
-			return nil, err
-		}
-		if tip.Commit == "" {
-			continue // The ref was removed after enumeration.
-		}
-		exists, err := r.branchExists(ctx, branch)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, RefInfo{Ref: ref, Branch: branch, Tip: tip.Commit, Base: tip.Base, Orphaned: !exists})
+	for _, name := range names {
+		tip := tips[name]
+		result = append(result, RefInfo{Ref: name, Branch: tip.Branch, Tip: tip.Commit, Base: tip.Base, Orphaned: refs["refs/heads/"+tip.Branch] == ""})
 	}
 	return result, nil
 }
