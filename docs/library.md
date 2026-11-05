@@ -47,10 +47,12 @@ Capture includes tracked edits/deletions and non-ignored untracked files by defa
 | `Info`, `Status` | Current directory, branch and HEAD; checkpoint tip/base and whether its stack is active |
 | `History` | Checkpoints newest first, ending before the normal base commit |
 | `Discover` | Validated checkpoints from a bounded candidate walk over explicit full commit roots |
+| `DiscoverStacks` | Root classification and bounded validated checkpoint-stack traversal with immutable continuation |
 | `Refs` | Sorted owned refs, including refs whose normal branch has been deleted |
 | `Reflog` | Retained entries newest first; ordinal selectors distinguish duplicate tips |
 | `Inspect` | An owned checkpoint compared with its parent |
 | `Compare` | Two explicit commit revisions resolved to full object IDs |
+| `ComparePatches` | Exact resolved pair with patches only for explicit literal selections |
 | `ReadFile` | Exact blob bytes; a stored symlink returns its target bytes |
 
 `HistoryOptions.Revision` selects an older stack, including one discovered via a reflog selector. The default selects the current branch's checkpoint tip even when stale. Limits of zero mean unlimited; negative limits fail. History path filtering keeps checkpoints whose parent comparison touches a selected path; the limit counts matching checkpoints. Review filtering never changes the earlier capture's scope.
@@ -65,9 +67,19 @@ listing, err := repository.Discover(ctx, wip.DiscoveryOptions{
 })
 ```
 
-Roots are deduplicated and Git traverses their ancestry once. Every visited commit counts, including ordinary commits unrelated to checkpoints, so a sparse history still stops at the budget. `Visited` reports the candidate count; `Incomplete` reports a budget stop or failure. Check `Failures` even when `err` is nil: unavailable/noncommit roots and malformed owned candidates are identified explicitly while valid checkpoints may still be returned. Invalid option IDs return `KindInvalidOption`; command errors, cancellation and output caps return an incomplete result plus an error. Ordinary commits are skipped. The library owns checkpoint format recognition and strict local base/parent validation; no path diffs are performed. The application selects roots, filters checkpoint content, computes fingerprints and orders the display. Re-run for each fresh listing; discovery has no persistent cache or continuation session.
+Roots are deduplicated and Git traverses their ancestry once. Every visited commit counts, including ordinary commits unrelated to checkpoints, so a sparse history still stops at the budget. `Visited` reports the candidate count; `Incomplete` reports a budget stop or failure. Check `Failures` even when `err` is nil: unavailable/noncommit roots and malformed owned candidates are identified explicitly while valid checkpoints may still be returned. Invalid option IDs return `KindInvalidOption`; command errors, cancellation and output caps return an incomplete result plus an error. Ordinary commits are skipped. The library owns checkpoint format recognition and strict local base/parent validation; no path diffs are performed. The application selects roots, filters checkpoint content, computes fingerprints and orders the display. Re-run for each fresh listing; `Discover` has no persistent cache or continuation session.
 
 Discovery batches root metadata, candidate bodies and validation dependencies, reusing them within the call. It reads one additional candidate ID to distinguish an exhausted walk, and may read immediate checkpoint parents/base metadata outside the candidate window. Those validation reads are excluded from `Visited` and remain subject to per-command output caps. An incomplete window does not establish that all older ancestry is valid. Candidate limits and byte limits bound different costs; configure both along with a context deadline for an embedding read budget.
+
+## Stack-specific discovery and patch-only comparisons
+
+`DiscoverStacks(ctx, StackDiscoveryOptions)` classifies each admitted explicit full lowercase commit root as `checkpoint`, `noncheckpoint`, `unavailable` or `invalid` before charging ancestry work. Ordinary roots are classified without traversing their ordinary history. It follows only validated same-branch/base checkpoint parent links, stopping at the normal base; malformed intermediary commits never expose older checkpoints. `CheckpointLimit` must be positive and permit lookahead, and bounds additional ancestry candidates rather than root classification or dependency validation. `Roots` and `Continuation` are mutually exclusive. At most 4,096 distinct roots and 16,384 cursor-state entries are admitted. Root checkpoints may exceed the per-page ancestry budget.
+
+`StackDiscoveryResult` contains initial-call root classifications, newly published checkpoints, `Visited` additional ancestry candidates, explicit `Failures`, typed `Coverage` and an optional `Continuation`. Coverage separates `RootsComplete`, `Exhausted` and `Stop` (`complete`, `budget`, `failure` or `state_limit`). Check failures even if the top-level error is nil; an exhausted frontier does not erase blocked ancestry. State-limit stops have no continuation. The opaque immutable `*StackContinuation` is process-local and bound to the exact working tree; reuse yields the same page while objects exist. It cannot be serialized as authoritative state and pins no objects. Applications own source-inventory freshness, paging sessions and display ordering. Existing `Discover` behavior is unchanged.
+
+`ComparePatches(ctx, from, to, paths)` returns `Patches{From, To, Files}` with exact resolved endpoint IDs and one `PatchFile{Path, Patch}` per stable deduplicated normalized selection. It resolves the pair once, normalizes the required nonempty explicit literal path list once, and generates only per-path patches without unused status or line-count summaries. Paths use the same invocation-relative confinement and directory-selection rules as comparisons, including root comparisons. Rename detection, external diff, text conversion and color are disabled. Configured `MaxStdoutBytes` bounds both each command and the combined returned patch text; overflow returns `KindOutputLimit`. The special from value `empty` is accepted only when to resolves to a verified root commit. No refs, index or working files are written.
+
+These APIs are implemented in this checkout; publication and downstream dependency-pin validation remain separate delivery steps.
 
 ## Ref lifecycle and deletion
 
