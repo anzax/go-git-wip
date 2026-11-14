@@ -1,16 +1,10 @@
 # CLI contract
 
-`go-git-wip` is a thin adapter over the public `wip` package. Git 2.30 or newer
-and a supported Linux or macOS working tree are required for repository commands.
-No arguments prints help and exits successfully. Help and version work outside a
-repository. There are no interactive prompts, editor launches, or implicit writes.
+`go-git-wip` is a thin adapter over the public `wip` package. Git 2.30 or newer and a supported Linux or macOS working tree are required for repository commands. No arguments prints help and exits successfully. Help and version work outside a repository. There are no interactive prompts, editor launches, or implicit writes.
 
 ## Commands
 
-Global flags are `-C DIRECTORY` (default `.`) and `--json`. Paths are literal and
-relative to that directory, including when it is below the repository root. Use
-`--` before positional paths that begin with a dash. Revisions use ordinary Git
-commit syntax; JSON object IDs returned by the library are always full IDs.
+Global flags are `-C DIRECTORY` (default `.`) and `--json`. Paths are literal and relative to that directory, including when it is below the repository root. Use `--` before positional paths that begin with a dash. Revisions use ordinary Git commit syntax; JSON object IDs returned by the library are always full IDs.
 
 | Command | Behavior |
 | --- | --- |
@@ -22,54 +16,23 @@ commit syntax; JSON object IDs returned by the library are always full IDs.
 | `show REVISION` | An owned checkpoint's changes relative to its parent |
 | `diff FROM TO` | Compare two explicit commit revisions |
 | `file REVISION PATH` | Write exact historical file bytes to stdout |
+| `prune [--ref REF] --keep-last N/--keep-days D [--dry-run]` | Retain selected branch checkpoints protected by either explicit rule |
 | `delete REF --expect TIP --yes` | Conditionally delete one owned checkpoint ref |
 | `cleanup` | Preview orphaned checkpoint refs without deleting anything |
 | `cleanup REF=TIP [REF=TIP...] --yes` | Conditionally delete only the supplied, still-orphaned refs |
 | `version`, `--version`, `-v` | Print the build version |
 
-`save` accepts `--baseline`, `--tracked-only`, `--ignored`, and `--message/-m TEXT`.
-Default saves include tracked and non-ignored untracked files. `--tracked-only`
-excludes untracked files while retaining staged additions. `--ignored` also includes
-ignored files and conflicts with `--tracked-only`. Explicit paths never override
-eligibility. These rules also apply to forced baselines.
-Baseline forces a checkpoint even when the tree is unchanged. Every snapshot starts
-from HEAD, so a partial capture leaves unselected paths at HEAD content, not at the
-previous checkpoint's content. No path arguments select the whole repository. Every
-explicit path must match eligible content, including deleted tracked paths; a typo,
-excluded-only path, or mixed valid/unmatched selection fails with exit 2 and
-`invalid_option` in JSON diagnostics. Use `-m TEXT` for a checkpoint message; positional
-arguments are paths. An unchanged eligible file is valid, but no-change succeeds
-without a commit only when the complete proposed snapshot matches its parent.
+`save` accepts `--baseline`, `--tracked-only`, `--ignored`, and `--message/-m TEXT`. Default saves include tracked and non-ignored untracked files. `--tracked-only` excludes untracked files while retaining staged additions. `--ignored` also includes ignored files and conflicts with `--tracked-only`. Explicit paths never override eligibility. These rules also apply to forced baselines. Baseline forces a checkpoint even when the tree is unchanged. Every snapshot starts from HEAD, so a partial capture leaves unselected paths at HEAD content, not at the previous checkpoint's content. No path arguments select the whole repository. Every explicit path must match eligible content, including deleted tracked paths; a typo, excluded-only path, or mixed valid/unmatched selection fails with exit 2 and `invalid_option` in JSON diagnostics. Use `-m TEXT` for a checkpoint message; positional arguments are paths. An unchanged eligible file is valid, but no-change succeeds without a commit only when the complete proposed snapshot matches its parent.
 
-`-m TEXT` supplies the human message shown by ordinary Git logs; defaults are
-`Checkpoint` and `Baseline`. New checkpoints place ownership metadata in a version-2
-footer. Messages starting `go-git-wip:` receive the visible prefix `Checkpoint: `
-in raw Git subjects to disambiguate legacy storage. Human CLI history displays the
-original message's first line; JSON returns the full original message, including
-trailing newlines, without internal metadata.
-Version-1 checkpoints and mixed-version stacks remain readable and manageable
-without migration. Fixed Git author identity does not identify a session; keep
-session identity in caller records and use a readable message label when helpful.
+`-m TEXT` supplies the human message shown by ordinary Git logs; defaults are `Checkpoint` and `Baseline`. New checkpoints place ownership metadata in a version-2 footer. Messages starting `go-git-wip:` receive the visible prefix `Checkpoint: ` in raw Git subjects to disambiguate legacy storage. Human CLI history displays the original message's first line; JSON returns the full original message, including trailing newlines, without internal metadata. Version-1 checkpoints and mixed-version stacks remain readable and manageable without migration. Fixed Git author identity does not identify a session; keep session identity in caller records and use a readable message label when helpful.
 
-`history` and `reflog` accept `--limit N`; zero means unlimited and negative values
-are usage errors. `history`, `show`, and `diff` accept repeatable `--path PATH` filters.
-`show` and `diff` accept `--patch` to include a textual Git patch in addition to the
-structured changed-file summary. Rename detection is disabled. History filtering
-changes the displayed entries, not the scope of saved checkpoints.
+`history` and `reflog` accept `--limit N`; zero means unlimited and negative values are usage errors. `history`, `show`, and `diff` accept repeatable `--path PATH` filters. `show` and `diff` accept `--patch` to include a textual Git patch in addition to the structured changed-file summary. Rename detection is disabled. History filtering changes the displayed entries, not the scope of saved checkpoints.
 
-A ref argument for `reflog`, `delete`, or `cleanup` is a complete `refs/wip/...`
-name. `--expect` and cleanup TIP values are full observed commit IDs. Missing
-checkpoint refs produce empty history/reflog or `deleted: false` as appropriate.
-A missing file or invalid explicit revision is an error. Default history is empty
-on detached or unborn HEAD. Default reflog on detached HEAD fails clearly because
-there is no branch ref to select. Explicit comparisons, reads, history, reflogs,
-and ref management remain available when their selected revisions exist.
+A ref argument for `reflog`, `delete`, or `cleanup` is a complete `refs/wip/...` name. `--expect` and cleanup TIP values are full observed commit IDs. Missing checkpoint refs produce empty history/reflog or `deleted: false` as appropriate. A missing file or invalid explicit revision is an error. Default history is empty on detached or unborn HEAD. Default reflog on detached HEAD fails clearly because there is no branch ref to select. Explicit comparisons, reads, history, reflogs, and ref management remain available when their selected revisions exist.
 
 ## Deletion workflow
 
-No command reads stdin for confirmation. Deletion always requires `--yes`; missing
-confirmation or expected-tip input is a usage error, even with terminal stdin.
-Neither piped input nor an affirmative answer can substitute for this flag.
+No command reads stdin for confirmation. Whole-ref deletion always requires `--yes`; missing confirmation or expected-tip input is a usage error, even with terminal stdin. Neither piped input nor an affirmative answer can substitute for this flag.
 
 First inspect `refs` or `cleanup`, then pass the exact ref and tip being approved:
 
@@ -81,20 +44,25 @@ go-git-wip -C ./project cleanup --json
 go-git-wip -C ./project cleanup refs/wip/deleted-topic=FULL_TIP --yes
 ```
 
-`cleanup --yes` without explicit targets is a usage error. Supplying targets without
-`--yes` is also a usage error. Preview returns the same `RefInfo` records as `refs`,
-filtered to orphaned refs. Cleanup checks each target's ownership, observed tip, and
-current orphan status through the library. Failures can coexist with successful
-deletions; output reports both and the command exits nonzero. No object pruning or
-Git garbage collection is performed.
+`cleanup --yes` without explicit targets is a usage error. Supplying targets without `--yes` is also a usage error. Preview returns the same `RefInfo` records as `refs`, filtered to orphaned refs. Cleanup checks each target's ownership, observed tip, and current orphan status through the library. Failures can coexist with successful deletions; output reports both and the command exits nonzero. No object pruning or Git garbage collection is performed.
+
+## Pruning workflow
+
+```sh
+go-git-wip prune --keep-last 100 --keep-days 30 --dry-run
+go-git-wip prune --keep-last 100 --keep-days 30
+go-git-wip prune --ref refs/wip/topic --keep-last 50 --json
+```
+
+Supply at least one retention flag, with a positive value for every specified flag; omit flags for unused rules. An explicitly empty `--ref` is a usage error. Either rule protects a checkpoint, and the live tip always survives. Count ranking is live tip first, distinct reflog publications newest first, then ancestry-only checkpoints in deterministic descendant-before-parent order. Days compare checkpoint committer timestamps inclusively against current time minus whole 24-hour periods. Counts span retained stacks of the selected ref. Default selection requires an attached branch; explicit refs support detached callers and orphaned branches. This explicit command and its retention options authorize pruning; there is no `--yes` flag or prompt.
+
+Output reports before, remaining, pruned and rewritten counts plus the current tip, including no-op results. Dry runs and plans removing nothing write nothing. Dry-run counts describe the proposal and its tip remains the original ID. Retained snapshot contents, messages, identity and timestamps survive, but rewritten IDs can expire old links. The selected reflog retires discarded discovery roots; no object GC runs. Files refs are required; reftable, shallow/grafted history and signed commits requiring rewrites are unsupported.
+
+Reflog and ref publication use two ordered renames. Errors after publication begins emit the partial `PruneResult` to stdout, including `reflog_published` and `ref_published`, plus an error on stderr. Inspect these flags and the repository before retrying. Cancellation can occur after publication completed.
 
 ## Output and exit codes
 
-Human output is concise: saves report a full commit ID or `No changes`; status names
-the branch, HEAD and active/stale/missing history; history and refs include full IDs;
-comparison output lists change status, path and line counts or binary status.
-The `file` command emits only the raw file bytes, without an added newline.
-Diagnostics go to stderr, never mixed into normal stdout data.
+Human output is concise: saves report a full commit ID or `No changes`; status names the branch, HEAD and active/stale/missing history; history and refs include full IDs; comparison output lists change status, path and line counts or binary status. The `file` command emits only the raw file bytes, without an added newline. Diagnostics go to stderr, never mixed into normal stdout data.
 
 `--json` emits one JSON value followed by a newline on stdout:
 
@@ -105,23 +73,13 @@ Diagnostics go to stderr, never mixed into normal stdout data.
 | `show`, `diff` | Public `Comparison` object; requested `patch` included when nonempty |
 | `file` | `{ "revision": "INPUT_REVISION", "path": "INPUT_PATH", "content_base64": "..." }` |
 | `delete` | Public `DeleteResult` object |
+| `prune` | Public `PruneResult` object, including proposed counts on dry runs |
 | `cleanup` preview | Array of orphaned public `RefInfo` records |
 | `cleanup` deletion | Public `CleanupResult` object |
 
-Object keys follow public Go types' snake_case JSON tags. Top-level list results
-use `[]` when empty. File revision/path echo the request; `content_base64` always
-encodes the exact returned bytes. Timestamps use RFC 3339 as encoded by Go's
-`time.Time`. Reflog selectors distinguish repeated records. Additional fields may
-be added; consumers should ignore unknown keys. Help/version remain ordinary text
-regardless of `--json`.
+Object keys follow public Go types' snake_case JSON tags. Top-level list results use `[]` when empty. File revision/path echo the request; `content_base64` always encodes the exact returned bytes. Timestamps use RFC 3339 as encoded by Go's `time.Time`. Reflog selectors distinguish repeated records. Additional fields may be added; consumers should ignore unknown keys. Help/version remain ordinary text regardless of `--json`.
 
-On failure with `--json`, stderr contains one JSON object shaped as
-`{"error":{"kind":"CATEGORY","message":"DIAGNOSTIC"}}`. Categories are the
-library's `ErrorKind` strings, `usage` for command parsing/confirmation, `cancelled`
-for cancellation, and `failure` for other operational failures. Do not expose a
-Go error object directly through JSON. Ordinary command failures do not emit a
-success value. Partial cleanup is the exception: its result still goes to stdout,
-with a failure diagnostic on stderr.
+On failure with `--json`, stderr contains one JSON object shaped as `{"error":{"kind":"CATEGORY","message":"DIAGNOSTIC"}}`. Categories are the library's `ErrorKind` strings, `usage` for command parsing/confirmation, `cancelled` for cancellation, and `failure` for other operational failures. Do not expose a Go error object directly through JSON. Ordinary command failures do not emit a success value. Partial cleanup and partially published pruning are exceptions: its result still goes to stdout, with a failure diagnostic on stderr.
 
 | Exit | Meaning |
 | --- | --- |
@@ -131,20 +89,8 @@ with a failure diagnostic on stderr.
 | `3` | Conditional publication/deletion conflict |
 | `130` | Context cancellation or interruption |
 
-Partial cleanup uses exit 1 even if some individual failures are conflicts;
-cancellation takes precedence and uses 130 while preserving any partial result.
-The CLI maps errors to these categories, not directly to Git process exit codes.
-SIGINT cancels the shared operation context. As with the library, cancellation
-around publication may require inspecting the ref before retrying.
+Partial cleanup uses exit 1 even if some individual failures are conflicts; cancellation takes precedence and uses 130 while preserving any partial result. The CLI maps errors to these categories, not directly to Git process exit codes. SIGINT cancels the shared operation context. As with the library, cancellation around publication may require inspecting the ref before retrying.
 
 ## Public consumer example
 
-The runnable example imports only `github.com/anzax/go-git-wip` and standard-library
-packages. It creates its own disposable Git working tree, opens it with a cancellable
-context, creates a baseline, edits a file, creates another, captures both, and
-demonstrates an unchanged capture. It lists history, chooses two returned full
-commit IDs, and obtains their
-structured comparison. Setup uses explicit Git argument arrays and an isolated
-identity/configuration; it never mutates a caller's existing repository. Show error
-handling with `errors.As` for `*wip.Error` and `errors.Is` for cancellation. Keep the
-example small; it is an embedding workflow, not another command framework.
+The runnable example imports only `github.com/anzax/go-git-wip` and standard-library packages. It creates its own disposable Git working tree, opens it with a cancellable context, creates a baseline, edits a file, creates another, captures both, and demonstrates an unchanged capture. It lists history, chooses two returned full commit IDs, and obtains their structured comparison. Setup uses explicit Git argument arrays and an isolated identity/configuration; it never mutates a caller's existing repository. Show error handling with `errors.As` for `*wip.Error` and `errors.Is` for cancellation. Keep the example small; it is an embedding workflow, not another command framework.

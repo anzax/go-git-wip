@@ -112,3 +112,23 @@ Capture uses a fixed noninteractive identity, `WIP checkpoint <wip@localhost>`, 
 Conditional updates detect competing checkpoint writers; they do not provide an atomic snapshot while another process writes files or switches branches. A cancelled or killed operation around publication can update a ref without returning success: inspect `Status` or the ref before retrying. Harmless unreachable objects from failed captures remain for normal Git maintenance.
 
 The ref/reflog batching checks run on Linux/amd64 with Go 1.27.0 and Git 2.53.0; earlier library checks also ran on Linux/arm64. Linux and macOS are supported targets; macOS and the stated minimum Git version have not been execution-tested. See [architecture](architecture.md) for the storage protocol and transaction details, and [CLI usage](cli.md) for the optional adapter's output and confirmation rules.
+
+## Prune checkpoint history
+
+```go
+preview, err := repo.Prune(ctx, wip.PruneOptions{KeepLast: 100, KeepDays: 30, DryRun: true})
+if err != nil { return err }
+_ = preview // Before, Kept, Pruned and Rewritten describe the proposal.
+result, err := repo.Prune(ctx, wip.PruneOptions{KeepLast: 100, KeepDays: 30})
+if err != nil {
+    // Inspect result.ReflogPublished and result.RefPublished before retrying.
+    return err
+}
+_ = result
+```
+
+Either retention rule protects a checkpoint; the current live tip always survives. Counts cover distinct checkpoints across the selected branch's retained stacks. Ranking starts with the live tip, then distinct reflog publications newest first, then ancestry-only checkpoints in deterministic descendant-before-parent order. Days are inclusive 24-hour periods measured from one captured current time using checkpoint committer timestamps. Zero omits a rule; at least one positive rule is required. `Ref` defaults to the attached branch's checkpoint ref; supply a complete ref for an orphaned branch or detached caller.
+
+Dry runs and plans that remove nothing perform no writes, including objects and locks. Retained trees, raw messages, identity and timestamps survive; reparenting may change IDs and expire historical links. `Before`, `Kept`, `Pruned` and `Rewritten` count the proposal; dry-run `Tip` stays at `PreviousTip`. Publication flags describe completed renames. Pruning rewrites the selected reflog to retain surviving discovery roots while preserving retained publication order and genuine revisits; retained ancestors need no separate rows, so row counts can differ from checkpoint counts. It never runs GC. Other refs may independently retain old objects.
+
+Only the files ref backend is supported, including packed refs and linked worktrees. Complete inventory validation rejects malformed/missing dependencies, shallow/grafted history, unsafe paths, signed checkpoints that need reparenting, and plans that would collapse two retained checkpoints into one identical commit. A native ref lock and exact tip/reflog comparison detect competing writers. Reflog-first and ref-second publication is not atomic: an IO error or interruption can leave a partial publication. Inspect the result flags and repository before retrying. See [architecture](architecture.md#checkpoint-retention) for the precise publication contract.

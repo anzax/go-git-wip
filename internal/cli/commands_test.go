@@ -465,3 +465,31 @@ func TestExecutableExitCodesAndSignals(t *testing.T) {
 		t.Fatal("interrupted capture advanced checkpoint ref")
 	}
 }
+
+func TestPruneCLI(t *testing.T) {
+	f := newFixture(t)
+	for _, args := range [][]string{{"prune"}, {"prune", "--keep-last", "-1"}, {"prune", "--keep-days", "0"}, {"prune", "--keep-days", "-1"}, {"prune", "--keep-last", "0", "--keep-days", "1"}, {"prune", "--keep-last", "1", "--keep-days", "0"}, {"prune", "--ref=", "--keep-last", "1"}} {
+		code, out, diagnostic := invoke(f, args...)
+		if code != 2 || out != "" || diagnostic == "" {
+			t.Fatalf("invalid %v: %d %q %q", args, code, out, diagnostic)
+		}
+	}
+	save(t, f, "--baseline", "-m", "first")
+	save(t, f, "--baseline", "-m", "second")
+	tip := save(t, f, "--baseline", "-m", "third")
+	code, out, diagnostic := invoke(f, "prune", "--keep-last", "1", "--dry-run", "--json")
+	var result wip.PruneResult
+	decode(t, out, &result)
+	if code != 0 || diagnostic != "" || result.Before != 3 || result.Kept != 1 || result.Pruned != 2 || !result.DryRun || result.Tip != tip.Commit || result.RefPublished {
+		t.Fatalf("preview %d %+v %s", code, result, diagnostic)
+	}
+	code, out, diagnostic = invoke(f, "prune", "--keep-last", "1", "--json")
+	decode(t, out, &result)
+	if code != 0 || diagnostic != "" || result.Kept != 1 || !result.RefPublished || !result.ReflogPublished || result.Tip == tip.Commit {
+		t.Fatalf("prune %d %+v %s", code, result, diagnostic)
+	}
+	code, out, diagnostic = invoke(f, "prune", "--keep-last", "5")
+	if code != 0 || diagnostic != "" || !strings.Contains(out, "before 1, remaining 1") || !strings.Contains(out, "Pruned 0") {
+		t.Fatalf("noop %d %q %q", code, out, diagnostic)
+	}
+}

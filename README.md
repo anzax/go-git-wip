@@ -1,18 +1,14 @@
 # go-git-wip
 
-Save work-in-progress snapshots without changing your files, staging area, or
-current branch. Review them later using the CLI, the Go library, or Git itself.
+Save work-in-progress snapshots without changing your files, staging area, or current branch. Review them later using the CLI, the Go library, or Git itself.
 
-Checkpoints are stored as Git commits in a separate history for each branch. You
-can save unfinished work without adding commits to your normal branch history.
+Checkpoints are stored as Git commits in a separate history for each branch. You can save unfinished work without adding commits to your normal branch history.
 
-Inspired by [git-wip](https://github.com/bartman/git-wip) by Bart Trojanowski.
-This is an independent implementation with its own API and behavior.
+Inspired by [git-wip](https://github.com/bartman/git-wip) by Bart Trojanowski. This is an independent implementation with its own API and behavior.
 
 ## Install
 
-Requires Go 1.26.2+ and Git 2.30+. Targets Linux and macOS; validation so far has
-been on Linux only.
+Requires Go 1.26.2+ and Git 2.30+. Targets Linux and macOS; validation so far has been on Linux only.
 
 From this checkout:
 
@@ -20,8 +16,7 @@ From this checkout:
 make install
 ```
 
-This builds `go-git-wip` and installs it into `~/.local/bin`. Make sure that directory
-is on your `PATH`. To use another location, run `make install BINDIR=/your/bin`.
+This builds `go-git-wip` and installs it into `~/.local/bin`. Make sure that directory is on your `PATH`. To use another location, run `make install BINDIR=/your/bin`.
 
 To try it without installing, run `make build` and use `./bin/go-git-wip`.
 
@@ -43,17 +38,13 @@ go-git-wip history
 go-git-wip show CHECKPOINT_ID --patch
 ```
 
-Saving includes changes to tracked files and new files that Git does not ignore.
-It leaves your files and staging decisions intact, including partially staged
-files. If the snapshot matches the previous checkpoint, `save` reports `No changes`.
+Saving includes changes to tracked files and new files that Git does not ignore. It leaves your files and staging decisions intact, including partially staged files. If the snapshot matches the previous checkpoint, `save` reports `No changes`.
 
-Use `-C /path/to/project` to work in another repository. Add `--json` for scripts.
-See the [CLI guide](docs/cli.md) for comparisons, file reads, and checkpoint deletion.
+Use `-C /path/to/project` to work in another repository. Add `--json` for scripts. See the [CLI guide](docs/cli.md) for comparisons, file reads, checkpoint deletion, and explicit retention with `prune --keep-last N --keep-days D --dry-run`. Either retention rule protects a checkpoint; pruning preserves retained snapshot contents and timestamps but can change checkpoint IDs.
 
 ## What gets saved?
 
-By default, `save` captures the whole working tree, excluding ignored files. You
-can narrow or expand that selection:
+By default, `save` captures the whole working tree, excluding ignored files. You can narrow or expand that selection:
 
 ```sh
 go-git-wip save src/ README.md  # Only these paths
@@ -61,25 +52,15 @@ go-git-wip save --tracked-only # Exclude new, untracked files
 go-git-wip save --ignored      # Also include ignored files
 ```
 
-Each snapshot starts from your current branch commit (`HEAD`). When you save only
-selected paths, all other paths use their HEAD content—even if an earlier
-checkpoint saved changes to them. Explicit paths must match files eligible for
-capture; a typo or an excluded-only selection is an error.
+Each snapshot starts from your current branch commit (`HEAD`). When you save only selected paths, all other paths use their HEAD content—even if an earlier checkpoint saved changes to them. Explicit paths must match files eligible for capture; a typo or an excluded-only selection is an error.
 
-Checkpoints live under `refs/wip/<branch>`. After HEAD changes, for example when
-you make a normal commit, the next checkpoint starts a new history from that
-commit. Older histories may still be available through `go-git-wip reflog` while
-Git retains them.
+Checkpoints live under `refs/wip/<branch>`. After HEAD changes, for example when you make a normal commit, the next checkpoint starts a new history from that commit. Older histories may still be available through `go-git-wip reflog` while Git retains them.
 
-Checkpoints are temporary local history, not backups. Git's normal expiry and
-garbage collection rules apply. The tool can read saved files but does not restore
-your working tree. Capture does not support sparse worktrees, unresolved merge
-conflicts, or submodules. Included files are not scanned for secrets.
+Checkpoints are temporary local history, not backups. Git's normal expiry and garbage collection rules apply. The tool can read saved files but does not restore your working tree. Capture does not support sparse worktrees, unresolved merge conflicts, or submodules. Included files are not scanned for secrets.
 
 ## Use it from Go
 
-The public package is `wip`. It uses the standard library and your local Git
-executable; the CLI is optional.
+The public package is `wip`. It uses the standard library and your local Git executable; the CLI is optional.
 
 ```go
 import (
@@ -97,11 +78,9 @@ func checkpoint(ctx context.Context, directory string) (wip.CaptureResult, error
 }
 ```
 
-The [library guide](docs/library.md) covers history, comparisons, errors, and
-cancellation. For agent integrations, see [session tracking](docs/agent-sessions.md).
+The [library guide](docs/library.md) covers history, comparisons, errors, and cancellation. For agent integrations, see [session tracking](docs/agent-sessions.md).
 
-Run a complete example with `make example`. It creates and removes its own temporary
-repository, so you can try it without changing an existing project.
+Run a complete example with `make example`. It creates and removes its own temporary repository, so you can try it without changing an existing project.
 
 ## Development
 
@@ -111,15 +90,10 @@ make build   # Build bin/go-git-wip
 make race    # Optional; requires cgo and a C compiler
 ```
 
-The root package contains the library. `internal/cli` handles commands and output;
-`cmd/go-git-wip` is the executable entry point.
+The root package contains the library. `internal/cli` handles commands and output; `cmd/go-git-wip` is the executable entry point.
 
-See [requirements](docs/requirements.md), [architecture](docs/architecture.md),
-[contributor instructions](AGENTS.md), and [task workflow](tasks/README.md).
-Validation details and platform limitations are recorded in the
-[library guide](docs/library.md#errors-cancellation-and-limits).
+See [requirements](docs/requirements.md), [architecture](docs/architecture.md), [contributor instructions](AGENTS.md), and [task workflow](tasks/README.md). Validation details and platform limitations are recorded in the [library guide](docs/library.md#errors-cancellation-and-limits).
 
 ## License
 
-[MIT](LICENSE). The CLI uses Cobra (Apache-2.0), with pflag (BSD-3-Clause) and
-mousetrap (Apache-2.0) as indirect dependencies. Dependency licenses remain their own.
+[MIT](LICENSE). The CLI uses Cobra (Apache-2.0), with pflag (BSD-3-Clause) and mousetrap (Apache-2.0) as indirect dependencies. Dependency licenses remain their own.

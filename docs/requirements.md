@@ -52,6 +52,8 @@ Delete a selected checkpoint ref without changing normal branches, HEAD, staging
 
 List orphaned refs before cleanup, and let callers choose explicit deletion targets. Cleanup returns the refs deleted and any failures; do not imply a multi-ref operation was atomic if some deletions succeeded. Never run garbage collection or prune Git objects automatically. The library has no confirmation prompts.
 
+Prune one selected checkpoint ref with positive count and/or whole-day retention. Either rule protects a checkpoint, and the current live tip always survives. Include all owned stacks reachable from its tip and retained reflog new-IDs. Preserve retained snapshot content, exact commit message envelope, identity, timestamp and original normal base; checkpoint IDs may change when reparenting skips discarded checkpoints. Retire discarded reflog roots without running GC. Dry runs and retention that removes nothing must not create objects, locks, or other writes. Validate the complete inventory before writes, reject unsafe storage, detect concurrent tip/reflog changes, and report partial publication explicitly.
+
 ## CLI
 
 Design the command surface around the library operations: capture/baseline, status, history, ref listing, inspection/comparison, deletion, and cleanup. Final command names are decided during CLI work, without legacy aliases or config requirements.
@@ -59,7 +61,7 @@ Design the command surface around the library operations: capture/baseline, stat
 - No arguments shows help. Writes require explicit commands; help/version work outside a repository. Provide an explicit repository-directory option.
 - Offer clear human output and JSON for structured results, including full object IDs. Keep diagnostics on stderr and data on stdout. Document the JSON format.
 - An unchanged capture exits successfully. Errors exit nonzero; document stable exit categories without exposing raw Git exit codes as the entire application contract.
-- Destructive commands require explicit confirmation or a noninteractive flag. Scripts must never hang waiting for a prompt. Define behavior when stdin is not a terminal and test it. Avoid terminal detection dependencies unless actually needed.
+- Whole-ref deletion commands require explicit confirmation or a noninteractive flag. Pruning is explicitly authorized by its retention options and needs no separate confirmation. Scripts must never hang waiting for a prompt. Define behavior when stdin is not a terminal and test it. Avoid terminal detection dependencies unless actually needed.
 - Do not advertise unsupported signing, configuration, or editor integrations.
 
 ## Embedding and documentation

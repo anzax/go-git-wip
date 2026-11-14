@@ -277,3 +277,47 @@ func printLine(cmd *cobra.Command, format string, values ...any) error {
 	_, err := fmt.Fprintf(cmd.OutOrStdout(), format+"\n", values...)
 	return err
 }
+
+func (o *options) pruneCommand() *cobra.Command {
+	var options wip.PruneOptions
+	cmd := &cobra.Command{Use: "prune [--ref REF] --keep-last N/--keep-days D [--dry-run]", Short: "Prune checkpoint history with explicit retention", Args: argumentCount(0, 0)}
+	cmd.Flags().StringVar(&options.Ref, "ref", "", "complete checkpoint ref; defaults to current branch")
+	cmd.Flags().IntVar(&options.KeepLast, "keep-last", 0, "retain this many newest distinct checkpoints")
+	cmd.Flags().IntVar(&options.KeepDays, "keep-days", 0, "retain checkpoints within this many whole days")
+	cmd.Flags().BoolVar(&options.DryRun, "dry-run", false, "report proposed counts without writing")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if options.KeepLast < 0 || options.KeepDays < 0 || options.KeepLast == 0 && options.KeepDays == 0 || cmd.Flags().Changed("keep-last") && options.KeepLast == 0 || cmd.Flags().Changed("keep-days") && options.KeepDays == 0 {
+			return &usageError{"prune requires positive values for specified --keep-last and --keep-days flags"}
+		}
+		if cmd.Flags().Changed("ref") && options.Ref == "" {
+			return &usageError{"--ref must not be empty when specified"}
+		}
+		r, err := o.repository(cmd)
+		if err != nil {
+			return err
+		}
+		result, operationErr := r.Prune(cmd.Context(), options)
+		if operationErr == nil || result.ReflogPublished || result.RefPublished {
+			if o.json {
+				err = writeJSON(cmd, result)
+			} else {
+				prefix := "Pruned"
+				if operationErr != nil {
+					prefix = "Incomplete pruning; planned to prune"
+				}
+				if result.DryRun {
+					prefix = "Would prune"
+				}
+				err = printLine(cmd, "%s %d checkpoints from %s: before %d, remaining %d, rewritten %d; current %s", prefix, result.Pruned, result.Ref, result.Before, result.Kept, result.Rewritten, result.Tip)
+				if err == nil && operationErr != nil {
+					err = printLine(cmd, "Publication: reflog=%t, ref=%t; inspect repository before retrying", result.ReflogPublished, result.RefPublished)
+				}
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return operationErr
+	}
+	return cmd
+}

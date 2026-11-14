@@ -50,7 +50,7 @@ func newCommand(version string) (*cobra.Command, *options) {
 			return err
 		},
 	})
-	root.AddCommand(opts.saveCommand(), opts.statusCommand(), opts.historyCommand(), opts.refsCommand(), opts.reflogCommand(), opts.showCommand(), opts.diffCommand(), opts.fileCommand(), opts.deleteCommand(), opts.cleanupCommand())
+	root.AddCommand(opts.saveCommand(), opts.statusCommand(), opts.historyCommand(), opts.refsCommand(), opts.reflogCommand(), opts.showCommand(), opts.diffCommand(), opts.fileCommand(), opts.deleteCommand(), opts.cleanupCommand(), opts.pruneCommand())
 	return root, opts
 }
 
